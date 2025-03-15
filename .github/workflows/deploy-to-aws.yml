@@ -19,12 +19,14 @@ jobs:
         with:
           tf_version: "1.9.8"
           tg_version: "0.69.1"
+          tg_dir: "aws"
+          tg_command: "run-all apply --terragrunt-non-interactive -auto-approve"
 
       - name: Terragrunt Init and Apply
         run: |
           cd aws  # Ajusta esto a la ruta donde está tu configuración de Terragrunt
           terragrunt run-all init --terragrunt-non-interactive
-          terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+          
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
