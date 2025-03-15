@@ -1,0 +1,73 @@
+name: Deploy to AWS with Terragrunt
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup terragrunt HCL
+        uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tf_version: "1.9.8"
+          tg_version: "0.69.1"
+
+      - name: Terragrunt Init and Apply
+        run: |
+          cd aws  # Ajusta esto a la ruta donde está tu configuración de Terragrunt
+          terragrunt run-all init --terragrunt-non-interactive
+          terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_STAGE: "prod"
+
+      - name: Get ECR Repository URL
+        run: |
+          cd aws  # Ajusta esto a la ruta donde está tu configuración de Terragrunt
+          ECR_URL=$(terragrunt output -raw ecr_repository_url)
+          echo "ECR_URL=${ECR_URL}" >> $GITHUB_ENV
+
+      - name: Get ECR password
+        id: ecr-password
+        run: |
+          ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
+          echo "ECR_PASSWORD=$ECR_PASSWORD" >> $GITHUB_OUTPUT
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ECR_URL }}
+          username: AWS
+          password: ${{ steps.ecr-password.outputs.ECR_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.ECR_URL }}:latest,${{ env.ECR_URL }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify Deployment
+        run: |
+          echo "Deployment completed successfully!"
+          echo "ECR Repository URL: ${{ env.ECR_URL }}"
+          echo "Image Tag: ${{ github.sha }}"

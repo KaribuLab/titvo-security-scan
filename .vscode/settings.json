@@ -1,0 +1,10 @@
+{
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": "\\.hcl$",
+                "cmd": "terragrunt hclfmt --terragrunt-hclfmt-file ${file}"
+            }
+        ]
+    }
+}

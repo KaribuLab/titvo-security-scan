@@ -1,0 +1,40 @@
+[MASTER]
+# Especificar el número de procesos paralelos
+jobs=1
+
+[MESSAGES CONTROL]
+# Deshabilitar mensajes específicos
+disable=
+    C0111, # missing-docstring (módulo)
+    C0103, # invalid-name
+    C0303, # trailing-whitespace
+    C0330, # bad-continuation
+    W0702, # bare-except
+    R0903, # too-few-public-methods
+    R0913, # too-many-arguments
+    W0703, # broad-except
+    R0914, # too-many-locals
+    R0912, # too-many-branches
+    R0915, # too-many-statements
+
+[FORMAT]
+# Longitud máxima de línea
+max-line-length=100
+
+[DESIGN]
+# Número máximo de argumentos para una función
+max-args=10
+# Número máximo de atributos para una clase
+max-attributes=15
+# Número máximo de declaraciones en una función
+max-statements=50
+
+[SIMILARITIES]
+# Número mínimo de líneas similares para considerar duplicación
+min-similarity-lines=7
+# Ignorar comentarios en la detección de duplicación
+ignore-comments=yes
+# Ignorar docstrings en la detección de duplicación
+ignore-docstrings=yes
+# Ignorar imports en la detección de duplicación
+ignore-imports=yes 

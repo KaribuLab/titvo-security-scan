@@ -1,0 +1,11 @@
+__pycache__
+.nox
+.venv
+.vscode
+.env
+aws
+terraform
+.pylintrc
+README.md
+serverless.hcl
+terragrunt.hcl
