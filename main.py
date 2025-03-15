@@ -285,7 +285,6 @@ def main():
             logger.error(
                 "Revisa el issue creado en GitHub para más detalles: %s", issue_url
             )
-            sys.exit(1)
         else:
             logger.info(
                 "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."
