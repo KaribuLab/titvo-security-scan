@@ -38,6 +38,7 @@ pip install -r requirements.txt
    GITHUB_REPO_NAME=usuario/nombre-repositorio
    GITHUB_COMMIT_SHA=hash_del_commit
    GITHUB_ASSIGNEE=usuario_para_asignar_issues
+   TITVO_SCAN_JOB_ID=identificador_unico_del_escaneo
    ```
 
 > [!IMPORTANT]
@@ -68,7 +69,8 @@ El script realizará las siguientes acciones:
 - `GITHUB_TOKEN`: Token de acceso personal de GitHub con permisos para crear issues
 - `GITHUB_REPO_NAME`: Nombre del repositorio en formato "usuario/repositorio"
 - `GITHUB_COMMIT_SHA`: Hash del commit que se desea analizar
-- `GITHUB_ASSIGNEE`: Usuario de GitHub al que se asignarán los issues (opcional, predeterminado: "pascencio")
+- `GITHUB_ASSIGNEE`: Usuario de GitHub al que se asignarán los issues
+- `TITVO_SCAN_JOB_ID`: Identificador único para el trabajo de escaneo actual
 
 ### Personalización
 
@@ -104,6 +106,7 @@ jobs:
           GITHUB_REPO_NAME: ${{ github.repository }}
           GITHUB_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_ASSIGNEE: ${{ github.event.pull_request.user.login }}
+          TITVO_SCAN_JOB_ID: ${{ github.run_id }}-${{ github.run_number }}
 ```
 
 ## Formato de respuesta
