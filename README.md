@@ -40,6 +40,9 @@ pip install -r requirements.txt
    GITHUB_ASSIGNEE=usuario_para_asignar_issues
    ```
 
+> [!IMPORTANT]
+> GITHUB_ASSIGNEE debe ser un usuario de GitHub válido. Se debe obtener con el API de GitHub [https://stackoverflow.com/questions/74252630/get-the-login-of-a-user-that-issued-a-comment-on-github-actions](https://stackoverflow.com/questions/74252630/get-the-login-of-a-user-that-issued-a-comment-on-github-actions).
+
 ## Uso del script
 
 El script `main.py` analiza un commit específico de GitHub y crea un issue con los resultados.
