@@ -61,7 +61,7 @@ inputs = {
           "ssm:GetParameter",
         ],
         "Resource" : [
-          "arn:aws:ssm:*:*:parameter${local.base_path}/github-security-scan*",
+          "arn:aws:ssm:*:*:parameter${local.base_path}/task-trigger*",
         ]
       },
       {
