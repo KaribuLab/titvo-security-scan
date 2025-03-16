@@ -46,9 +46,12 @@ inputs = {
   job_memory         = 4096
   job_command        = ["python", "main.py"]
   vpc_id             = dependency.parameters.outputs.parameters["${local.base_path}/infra/vpc-id"]
-  job_environment = {
-    "AWS_STAGE" = local.serverless.locals.stage
-  }
+  job_environment = [
+    {
+      name : "AWS_STAGE",
+      value : local.serverless.locals.stage
+    }
+  ]
   job_policy = jsonencode({
     "Version" : "2012-10-17",
     "Statement" : [
