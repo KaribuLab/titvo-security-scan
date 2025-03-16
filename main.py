@@ -23,7 +23,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO_NAME = os.getenv("GITHUB_REPO_NAME")
 GITHUB_COMMIT_SHA = os.getenv("GITHUB_COMMIT_SHA")
 GITHUB_ASSIGNEE = os.getenv("GITHUB_ASSIGNEE")  # Usuario para asignar issues
-TITVO_SCAN_JOB_ID = os.getenv("TITVO_SCAN_JOB_ID")  # ID del trabajo de escaneo
+TITVO_SCAN_TASK_ID = os.getenv("TITVO_SCAN_TASK_ID")  # ID del trabajo de escaneo
 
 if not all(
     [
@@ -31,7 +31,7 @@ if not all(
         GITHUB_TOKEN,
         GITHUB_REPO_NAME,
         GITHUB_COMMIT_SHA,
-        TITVO_SCAN_JOB_ID,
+        TITVO_SCAN_TASK_ID,
     ]
 ):
     logger.error("Faltan variables de entorno.")
@@ -41,11 +41,11 @@ if not all(
     logger.error("- GITHUB_REPO_NAME (formato: usuario/repositorio)")
     logger.error("- GITHUB_COMMIT_SHA")
     logger.error("- GITHUB_ASSIGNEE")
-    logger.error("- TITVO_SCAN_JOB_ID")
+    logger.error("- TITVO_SCAN_TASK_ID")
     sys.exit(1)
 
 # Imprimir el ID del trabajo de escaneo después de la validación
-logger.info("ID del trabajo de escaneo: %s", TITVO_SCAN_JOB_ID)
+logger.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
 
 # Modelo a utilizar
 MODELO = "claude-3-7-sonnet-latest"

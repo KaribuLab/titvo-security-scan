@@ -38,7 +38,7 @@ pip install -r requirements.txt
    GITHUB_REPO_NAME=usuario/nombre-repositorio
    GITHUB_COMMIT_SHA=hash_del_commit
    GITHUB_ASSIGNEE=usuario_para_asignar_issues
-   TITVO_SCAN_JOB_ID=identificador_unico_del_escaneo
+   TITVO_SCAN_TASK_ID=identificador_unico_del_escaneo
    ```
 
 > [!IMPORTANT]
@@ -70,7 +70,7 @@ El script realizará las siguientes acciones:
 - `GITHUB_REPO_NAME`: Nombre del repositorio en formato "usuario/repositorio"
 - `GITHUB_COMMIT_SHA`: Hash del commit que se desea analizar
 - `GITHUB_ASSIGNEE`: Usuario de GitHub al que se asignarán los issues
-- `TITVO_SCAN_JOB_ID`: Identificador único para el trabajo de escaneo actual
+- `TITVO_SCAN_TASK_ID`: Identificador único para el trabajo de escaneo actual
 
 ### Personalización
 
@@ -106,11 +106,11 @@ jobs:
           GITHUB_REPO_NAME: ${{ github.repository }}
           GITHUB_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_ASSIGNEE: ${{ github.event.pull_request.user.login }}
-          TITVO_SCAN_JOB_ID: ${{ github.run_id }}-${{ github.run_number }}
+          TITVO_SCAN_TASK_ID: ${{ github.run_id }}-${{ github.run_number }}
 ```
 
 ## Formato de respuesta
 
 El análisis de Claude siempre comenzará con uno de estos patrones:
 - `[COMMIT_RECHAZADO]` - Si se encuentran vulnerabilidades de severidad media, alta o crítica
-- `[COMMIT_APROBADO]` - Si no se encuentran vulnerabilidades o solo se encuentran de severidad baja 
+- `[COMMIT_APROBADO]` - Si no se encuentran vulnerabilidades o solo se encuentran de severidad baja
