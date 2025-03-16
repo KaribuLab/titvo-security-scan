@@ -9,6 +9,8 @@ Este proyecto contiene un script que analiza automáticamente commits de GitHub 
 - Creación automática de issues en GitHub con los resultados del análisis
 - Detección de patrones específicos para aprobar o rechazar commits
 - Asignación automática de issues a un usuario específico
+- Seguimiento del estado de los escaneos en DynamoDB
+- Obtención de configuración desde AWS Parameter Store
 
 ## Requisitos
 
@@ -57,11 +59,13 @@ python main.py
 ```
 
 El script realizará las siguientes acciones:
-1. Descargará los archivos del commit especificado
-2. Enviará el código a Claude para su análisis
-3. Creará un issue en GitHub con los resultados
-4. Asignará el issue al usuario especificado en `GITHUB_ASSIGNEE`
-5. Terminará con código de salida 1 si se detectan vulnerabilidades graves
+1. Obtendrá el item de escaneo desde DynamoDB y actualizará su estado a `IN_PROGRESS`
+2. Descargará los archivos del commit especificado
+3. Enviará el código a Claude para su análisis
+4. Creará un issue en GitHub con los resultados
+5. Asignará el issue al usuario especificado en `GITHUB_ASSIGNEE`
+6. Actualizará el estado del escaneo en DynamoDB según el resultado (`COMPLETED`, `FAILED` o `ERROR`)
+7. Terminará con código de salida 1 si se detectan vulnerabilidades graves
 
 ### Variables de entorno
 
@@ -71,6 +75,19 @@ El script realizará las siguientes acciones:
 - `GITHUB_COMMIT_SHA`: Hash del commit que se desea analizar
 - `GITHUB_ASSIGNEE`: Usuario de GitHub al que se asignarán los issues
 - `TITVO_SCAN_TASK_ID`: Identificador único para el trabajo de escaneo actual
+- `AWS_REGION`: Región de AWS donde se encuentra la tabla DynamoDB y Parameter Store
+
+### Integración con DynamoDB
+
+El script utiliza una tabla DynamoDB existente para almacenar y actualizar el estado de los escaneos:
+
+1. Al iniciar el análisis, se obtiene el item correspondiente al `TITVO_SCAN_TASK_ID` desde DynamoDB
+2. Se actualiza el estado a `IN_PROGRESS` antes de comenzar el análisis
+3. Si el análisis se completa sin detectar vulnerabilidades, se actualiza el estado a `COMPLETED`
+4. Si se detectan vulnerabilidades, se actualiza el estado a `FAILED`
+5. Si ocurre algún error durante el proceso, se actualiza el estado a `ERROR`
+
+El nombre de la tabla de DynamoDB se obtiene desde AWS Parameter Store con la clave `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`.
 
 ### Personalización
 
@@ -78,36 +95,6 @@ El script utiliza dos prompts principales que puedes modificar en el código:
 
 - `SYSTEM_PROMPT`: Define las instrucciones y comportamiento para Claude
 - `user_prompt`: Define la consulta específica que se envía a Claude con el código a analizar
-
-## Integración con CI/CD
-
-Este script puede integrarse en flujos de trabajo de CI/CD para analizar automáticamente los commits antes de permitir su fusión en ramas principales.
-
-Ejemplo de uso en GitHub Actions:
-```yaml
-name: Security Analysis
-on: [pull_request]
-jobs:
-  analyze:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run security analysis
-        run: python main.py
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO_NAME: ${{ github.repository }}
-          GITHUB_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-          GITHUB_ASSIGNEE: ${{ github.event.pull_request.user.login }}
-          TITVO_SCAN_TASK_ID: ${{ github.run_id }}-${{ github.run_number }}
-```
 
 ## Formato de respuesta
 

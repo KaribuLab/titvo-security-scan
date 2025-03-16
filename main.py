@@ -2,6 +2,8 @@ import os
 import sys
 import base64
 import logging
+import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from github import Github
@@ -221,9 +223,103 @@ def es_commit_seguro(analisis):
     return True
 
 
+def obtener_nombre_tabla():
+    """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
+    try:
+        # Inicializar el cliente de SSM
+        ssm = boto3.client("ssm")
+
+        # Obtener el parámetro
+        param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+        param_name = f"{param_path}/task-trigger/dynamo-task-table-name"
+        response = ssm.get_parameter(
+            Name=param_name,
+            WithDecryption=False,
+        )
+
+        # Extraer el valor del parámetro
+        nombre_tabla = response["Parameter"]["Value"]
+        logger.info("Nombre de tabla DynamoDB obtenido: %s", nombre_tabla)
+
+        return nombre_tabla
+    except ClientError as e:
+        logger.error(
+            "Error al obtener el nombre de la tabla desde Parameter Store: %s", e
+        )
+        return None
+
+
+def obtener_item_scan(scan_id):
+    """Obtiene el item de escaneo desde DynamoDB usando el scan_id."""
+    try:
+        # Obtener el nombre de la tabla
+        nombre_tabla = obtener_nombre_tabla()
+        if not nombre_tabla:
+            logger.error("No se pudo obtener el nombre de la tabla DynamoDB")
+            return None
+
+        # Inicializar el cliente de DynamoDB
+        dynamodb = boto3.resource("dynamodb")
+        tabla = dynamodb.Table(nombre_tabla)
+
+        # Obtener el item
+        response = tabla.get_item(Key={"scan_id": scan_id})
+
+        # Verificar si el item existe
+        if "Item" in response:
+            logger.info("Item de escaneo obtenido correctamente: %s", scan_id)
+            return response["Item"]
+        else:
+            logger.error("No se encontró el item con scan_id: %s", scan_id)
+            return None
+    except ClientError as e:
+        logger.error("Error al obtener el item desde DynamoDB: %s", e)
+        return None
+
+
+def actualizar_estado_scan(scan_id, estado):
+    """Actualiza el estado del escaneo en DynamoDB."""
+    try:
+        # Obtener el nombre de la tabla
+        nombre_tabla = obtener_nombre_tabla()
+        if not nombre_tabla:
+            logger.error("No se pudo obtener el nombre de la tabla DynamoDB")
+            return False
+
+        # Inicializar el cliente de DynamoDB
+        dynamodb = boto3.resource("dynamodb")
+        tabla = dynamodb.Table(nombre_tabla)
+
+        # Actualizar el item
+        tabla.update_item(
+            Key={"scan_id": scan_id},
+            UpdateExpression="set #status = :s",
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={":s": estado},
+            ReturnValues="UPDATED_NEW",
+        )
+
+        logger.info("Estado del escaneo actualizado a: %s", estado)
+        return True
+    except ClientError as e:
+        logger.error("Error al actualizar el estado en DynamoDB: %s", e)
+        return False
+
+
 def main():
     """Función principal para obtener una respuesta de Claude."""
     logger.info("Iniciando análisis de seguridad")
+
+    # Obtener el item de escaneo desde DynamoDB
+    item_scan = obtener_item_scan(TITVO_SCAN_TASK_ID)
+    if not item_scan:
+        logger.error("No se pudo obtener la información del escaneo desde DynamoDB")
+        sys.exit(1)
+
+    # Actualizar el estado a IN_PROGRESS
+    if not actualizar_estado_scan(TITVO_SCAN_TASK_ID, "IN_PROGRESS"):
+        logger.error("No se pudo actualizar el estado del escaneo a IN_PROGRESS")
+        sys.exit(1)
 
     # Inicializar el cliente de GitHub
     github_client = Github(GITHUB_TOKEN)
@@ -231,7 +327,8 @@ def main():
     # Descargar archivos del repositorio
     if not descargar_archivos_repositorio(github_client):
         logger.error("No se pudieron descargar los archivos del repositorio.")
-        return
+        actualizar_estado_scan(TITVO_SCAN_TASK_ID, "ERROR")
+        sys.exit(1)
 
     # Obtener el contenido de los archivos
     contenido_archivos = obtener_contenido_archivos()
@@ -285,15 +382,20 @@ def main():
             logger.error(
                 "Revisa el issue creado en GitHub para más detalles: %s", issue_url
             )
+            # Actualizar el estado a FAILED
+            actualizar_estado_scan(TITVO_SCAN_TASK_ID, "FAILED")
+            sys.exit(1)
         else:
             logger.info(
                 "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."
             )
+            # Actualizar el estado a COMPLETED
+            actualizar_estado_scan(TITVO_SCAN_TASK_ID, "COMPLETED")
 
-    # pylint: disable=broad-exception-caught
     except Exception as e:
-        # pylint: enable=broad-exception-caught
         logger.exception(e)
+        # Actualizar el estado a ERROR
+        actualizar_estado_scan(TITVO_SCAN_TASK_ID, "ERROR")
         sys.exit(1)
 
 
