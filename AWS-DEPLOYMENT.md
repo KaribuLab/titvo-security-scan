@@ -81,6 +81,7 @@ Si encuentras problemas durante el despliegue:
    - Clave primaria: `scan_id` (String)
    - Un campo `status` que puede tener los valores: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `ERROR`
    - Un campo `updated_at` que almacena la fecha de la última actualización en formato ISO (ej: "2025-03-16T06:44:14.075Z")
+   - Un campo `issue_url` que almacena la URL del issue creado en GitHub
 
 # Integración con AWS
 
@@ -105,6 +106,7 @@ Para ejecutar esta solución, necesitas:
    - Clave primaria: `scan_id` (String)
    - Un campo `status` que puede tener los valores: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `ERROR`
    - Un campo `updated_at` que almacena la fecha de la última actualización en formato ISO (ej: "2025-03-16T06:44:14.075Z")
+   - Un campo `issue_url` que almacena la URL del issue creado en GitHub
 
 3. Un parámetro en Parameter Store:
    - Nombre: `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`
@@ -118,7 +120,11 @@ El flujo de ejecución del script es el siguiente:
 2. Busca el item con el `scan_id` correspondiente al `TITVO_SCAN_TASK_ID` proporcionado
 3. Actualiza el estado del item a `IN_PROGRESS` y el campo `updated_at` a la fecha actual
 4. Realiza el análisis de seguridad del commit
-5. Actualiza el estado final según el resultado y el campo `updated_at` a la fecha actual:
-   - `COMPLETED`: Si no se detectan vulnerabilidades significativas
-   - `FAILED`: Si se detectan vulnerabilidades
-   - `ERROR`: Si ocurre algún error durante el proceso 
+5. Actualiza el estado final según el resultado del análisis:
+   - Si se detectan vulnerabilidades (`FAILED`):
+     - Crea un issue en GitHub con los resultados
+     - Guarda la URL del issue en DynamoDB
+   - Si no se detectan vulnerabilidades (`COMPLETED`):
+     - No se crea ningún issue
+   - Si ocurre algún error durante el proceso (`ERROR`):
+     - El script termina con código de salida 1 

@@ -279,8 +279,8 @@ def obtener_item_scan(scan_id):
         return None
 
 
-def actualizar_estado_scan(scan_id, estado):
-    """Actualiza el estado del escaneo en DynamoDB."""
+def actualizar_estado_scan(scan_id, estado, issue_url=None):
+    """Actualiza el estado del escaneo en DynamoDB y opcionalmente la URL del issue."""
     try:
         # Obtener el nombre de la tabla
         nombre_tabla = obtener_nombre_tabla()
@@ -293,20 +293,35 @@ def actualizar_estado_scan(scan_id, estado):
         tabla = dynamodb.Table(nombre_tabla)
         
         fecha_actual = datetime.now(pytz.utc).isoformat()
+        
+        # Preparar la expresión de actualización y los valores
+        update_expression = "set #status = :s, updated_at = :u"
+        expression_attribute_names = {"#status": "status"}
+        expression_attribute_values = {
+            ":s": estado,
+            ":u": fecha_actual
+        }
+        
+        # Si se proporciona la URL del issue, incluirla en la actualización
+        if issue_url:
+            update_expression += ", issue_url = :i"
+            expression_attribute_values[":i"] = issue_url
+            logger.info("Se incluirá la URL del issue en la actualización: %s", issue_url)
 
         # Actualizar el item
         tabla.update_item(
             Key={"scan_id": scan_id},
-            UpdateExpression="set #status = :s, updated_at = :u",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":s": estado,
-                ":u": fecha_actual
-            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeNames=expression_attribute_names,
+            ExpressionAttributeValues=expression_attribute_values,
             ReturnValues="UPDATED_NEW",
         )
 
-        logger.info("Estado del escaneo actualizado a: %s, fecha: %s", estado, fecha_actual)
+        log_message = f"Estado del escaneo actualizado a: {estado}, fecha: {fecha_actual}"
+        if issue_url:
+            log_message += f", issue_url: {issue_url}"
+        logger.info(log_message)
+        
         return True
     except ClientError as e:
         logger.error("Error al actualizar el estado en DynamoDB: %s", e)
@@ -376,26 +391,30 @@ def main():
         # Mostrar la respuesta
         logger.info("Respuesta de Claude:\n%s", analisis)
 
-        # Crear un issue en GitHub con el análisis
-        issue_url = crear_issue_github(analisis, GITHUB_COMMIT_SHA, github_client)
-        if issue_url:
-            logger.info("Se ha creado un issue con el análisis: %s", issue_url)
-
         # Verificar si el commit es seguro
         if not es_commit_seguro(analisis):
             logger.error(
                 "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
             )
-            logger.error(
-                "Revisa el issue creado en GitHub para más detalles: %s", issue_url
-            )
+            
+            # Crear un issue en GitHub solo si se detectan vulnerabilidades
+            issue_url = crear_issue_github(analisis, GITHUB_COMMIT_SHA, github_client)
+            if issue_url:
+                logger.info("Se ha creado un issue con el análisis: %s", issue_url)
+                logger.error(
+                    "Revisa el issue creado en GitHub para más detalles: %s", issue_url
+                )
+            
             # Actualizar el estado a FAILED
-            actualizar_estado_scan(TITVO_SCAN_TASK_ID, "FAILED")
+            actualizar_estado_scan(TITVO_SCAN_TASK_ID, "FAILED", issue_url)
+            
+            # No usamos sys.exit(1) aquí para no indicar un error del script
+            # Solo indicamos que el commit tiene vulnerabilidades
         else:
             logger.info(
                 "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."
             )
-            # Actualizar el estado a COMPLETED
+            # Actualizar el estado a COMPLETED sin crear issue
             actualizar_estado_scan(TITVO_SCAN_TASK_ID, "COMPLETED")
 
     except Exception as e:

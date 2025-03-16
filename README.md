@@ -62,10 +62,15 @@ El script realizará las siguientes acciones:
 1. Obtendrá el item de escaneo desde DynamoDB y actualizará su estado a `IN_PROGRESS`
 2. Descargará los archivos del commit especificado
 3. Enviará el código a Claude para su análisis
-4. Creará un issue en GitHub con los resultados
-5. Asignará el issue al usuario especificado en `GITHUB_ASSIGNEE`
-6. Actualizará el estado del escaneo en DynamoDB según el resultado (`COMPLETED`, `FAILED` o `ERROR`)
-7. Terminará con código de salida 1 si se detectan vulnerabilidades graves
+4. Si se detectan vulnerabilidades:
+   - Creará un issue en GitHub con los resultados
+   - Asignará el issue al usuario especificado en `GITHUB_ASSIGNEE`
+   - Actualizará el estado a `FAILED` y guardará la URL del issue en DynamoDB
+5. Si no se detectan vulnerabilidades:
+   - Actualizará el estado a `COMPLETED` en DynamoDB
+6. Si ocurre algún error durante el proceso:
+   - Actualizará el estado a `ERROR` en DynamoDB
+   - Terminará con código de salida 1
 
 ### Variables de entorno
 
@@ -83,9 +88,11 @@ El script utiliza una tabla DynamoDB existente para almacenar y actualizar el es
 
 1. Al iniciar el análisis, se obtiene el item correspondiente al `TITVO_SCAN_TASK_ID` desde DynamoDB
 2. Se actualiza el estado a `IN_PROGRESS` y el campo `updated_at` a la fecha actual
-3. Si el análisis se completa sin detectar vulnerabilidades, se actualiza el estado a `COMPLETED` y el campo `updated_at`
-4. Si se detectan vulnerabilidades, se actualiza el estado a `FAILED` y el campo `updated_at`
-5. Si ocurre algún error durante el proceso, se actualiza el estado a `ERROR` y el campo `updated_at`
+3. Se actualiza el estado final según el resultado del análisis:
+   - `COMPLETED`: Si no se detectan vulnerabilidades significativas (se elimina el campo `issue_url` si existía)
+   - `FAILED`: Si se detectan vulnerabilidades (en este caso también se crea un issue en GitHub y se guarda su URL)
+   - `ERROR`: Si ocurre algún error durante el proceso
+4. En todos los casos se actualiza el campo `updated_at` con la fecha actual
 
 El nombre de la tabla de DynamoDB se obtiene desde AWS Parameter Store con la clave `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`.
 
