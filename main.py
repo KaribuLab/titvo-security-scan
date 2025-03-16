@@ -2,11 +2,13 @@ import os
 import sys
 import base64
 import logging
+from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from github import Github
+import pytz
 
 # Configurar el logger
 logging.basicConfig(
@@ -289,17 +291,22 @@ def actualizar_estado_scan(scan_id, estado):
         # Inicializar el cliente de DynamoDB
         dynamodb = boto3.resource("dynamodb")
         tabla = dynamodb.Table(nombre_tabla)
+        
+        fecha_actual = datetime.now(pytz.utc).isoformat()
 
         # Actualizar el item
         tabla.update_item(
             Key={"scan_id": scan_id},
-            UpdateExpression="set #status = :s",
+            UpdateExpression="set #status = :s, updated_at = :u",
             ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={":s": estado},
+            ExpressionAttributeValues={
+                ":s": estado,
+                ":u": fecha_actual
+            },
             ReturnValues="UPDATED_NEW",
         )
 
-        logger.info("Estado del escaneo actualizado a: %s", estado)
+        logger.info("Estado del escaneo actualizado a: %s, fecha: %s", estado, fecha_actual)
         return True
     except ClientError as e:
         logger.error("Error al actualizar el estado en DynamoDB: %s", e)
@@ -384,7 +391,6 @@ def main():
             )
             # Actualizar el estado a FAILED
             actualizar_estado_scan(TITVO_SCAN_TASK_ID, "FAILED")
-            sys.exit(1)
         else:
             logger.info(
                 "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."

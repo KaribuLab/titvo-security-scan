@@ -8,6 +8,7 @@ El sistema se despliega con los siguientes componentes de AWS:
 
 - **ECR (Elastic Container Registry)**: Almacena la imagen Docker del analizador
 - **IAM Roles y Políticas**: Proporciona los permisos necesarios
+- **DynamoDB**: Almacena los datos del análisis
 
 ## Requisitos previos
 
@@ -72,4 +73,52 @@ Si encuentras problemas durante el despliegue:
 1. Verifica los logs de GitHub Actions para identificar en qué paso falló
 2. Comprueba que las credenciales de AWS tengan los permisos necesarios
 3. Verifica que los secretos estén correctamente configurados en GitHub
-4. Asegúrate de que la configuración de Terragrunt sea correcta y tenga los outputs necesarios 
+4. Asegúrate de que la configuración de Terragrunt sea correcta y tenga los outputs necesarios
+
+## Notas adicionales
+
+2. La tabla DynamoDB debe existir con:
+   - Clave primaria: `scan_id` (String)
+   - Un campo `status` que puede tener los valores: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `ERROR`
+   - Un campo `updated_at` que almacena la fecha de la última actualización en formato ISO (ej: "2025-03-16T06:44:14.075Z")
+
+# Integración con AWS
+
+Este documento describe cómo el Analizador de Seguridad para Commits de GitHub se integra con AWS.
+
+## Arquitectura
+
+El sistema utiliza los siguientes componentes de AWS:
+
+- **DynamoDB**: Almacena el estado de los escaneos de seguridad
+- **Parameter Store**: Almacena la configuración, como el nombre de la tabla DynamoDB
+
+## Requisitos previos
+
+Para ejecutar esta solución, necesitas:
+
+1. Acceso a AWS con permisos para:
+   - Leer parámetros de Parameter Store
+   - Leer y escribir en la tabla DynamoDB
+
+2. La tabla DynamoDB debe existir con:
+   - Clave primaria: `scan_id` (String)
+   - Un campo `status` que puede tener los valores: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `ERROR`
+   - Un campo `updated_at` que almacena la fecha de la última actualización en formato ISO (ej: "2025-03-16T06:44:14.075Z")
+
+3. Un parámetro en Parameter Store:
+   - Nombre: `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`
+   - Valor: Nombre de la tabla DynamoDB existente
+
+## Flujo de ejecución
+
+El flujo de ejecución del script es el siguiente:
+
+1. El script obtiene el nombre de la tabla DynamoDB desde Parameter Store
+2. Busca el item con el `scan_id` correspondiente al `TITVO_SCAN_TASK_ID` proporcionado
+3. Actualiza el estado del item a `IN_PROGRESS` y el campo `updated_at` a la fecha actual
+4. Realiza el análisis de seguridad del commit
+5. Actualiza el estado final según el resultado y el campo `updated_at` a la fecha actual:
+   - `COMPLETED`: Si no se detectan vulnerabilidades significativas
+   - `FAILED`: Si se detectan vulnerabilidades
+   - `ERROR`: Si ocurre algún error durante el proceso 

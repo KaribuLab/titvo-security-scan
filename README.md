@@ -82,10 +82,10 @@ El script realizará las siguientes acciones:
 El script utiliza una tabla DynamoDB existente para almacenar y actualizar el estado de los escaneos:
 
 1. Al iniciar el análisis, se obtiene el item correspondiente al `TITVO_SCAN_TASK_ID` desde DynamoDB
-2. Se actualiza el estado a `IN_PROGRESS` antes de comenzar el análisis
-3. Si el análisis se completa sin detectar vulnerabilidades, se actualiza el estado a `COMPLETED`
-4. Si se detectan vulnerabilidades, se actualiza el estado a `FAILED`
-5. Si ocurre algún error durante el proceso, se actualiza el estado a `ERROR`
+2. Se actualiza el estado a `IN_PROGRESS` y el campo `updated_at` a la fecha actual
+3. Si el análisis se completa sin detectar vulnerabilidades, se actualiza el estado a `COMPLETED` y el campo `updated_at`
+4. Si se detectan vulnerabilidades, se actualiza el estado a `FAILED` y el campo `updated_at`
+5. Si ocurre algún error durante el proceso, se actualiza el estado a `ERROR` y el campo `updated_at`
 
 El nombre de la tabla de DynamoDB se obtiene desde AWS Parameter Store con la clave `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`.
 
