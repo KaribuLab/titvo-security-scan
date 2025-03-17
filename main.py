@@ -419,10 +419,10 @@ def main():
 
         # Obtener el análisis de Claude
         analisis = respuesta.content[0].text
-        LOGGER.info("Análisis de seguridad recibido de Claude")
+        LOGGER.info("Análisis de seguridad recibido")
 
         # Mostrar la respuesta
-        LOGGER.info("Respuesta de Claude:\n%s", analisis)
+        LOGGER.info("Respuesta :\n%s", analisis)
 
         # Verificar si el commit es seguro
         if not is_commit_safe(analisis):
