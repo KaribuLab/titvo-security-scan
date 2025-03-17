@@ -29,30 +29,31 @@ GITHUB_COMMIT_SHA = os.getenv("GITHUB_COMMIT_SHA")
 GITHUB_ASSIGNEE = os.getenv("GITHUB_ASSIGNEE")  # Usuario para asignar issues
 TITVO_SCAN_TASK_ID = os.getenv("TITVO_SCAN_TASK_ID")  # ID del trabajo de escaneo
 
-if not all(
-    [
-        ANTHROPIC_API_KEY,
-        GITHUB_TOKEN,
-        GITHUB_REPO_NAME,
-        GITHUB_COMMIT_SHA,
-        TITVO_SCAN_TASK_ID,
-    ]
-):
-    logger.error("Faltan variables de entorno.")
-    logger.error("Asegúrate de configurar las siguientes variables en el archivo .env:")
-    logger.error("- ANTHROPIC_API_KEY")
-    logger.error("- GITHUB_TOKEN")
-    logger.error("- GITHUB_REPO_NAME (formato: usuario/repositorio)")
-    logger.error("- GITHUB_COMMIT_SHA")
-    logger.error("- GITHUB_ASSIGNEE")
-    logger.error("- TITVO_SCAN_TASK_ID")
-    sys.exit(1)
-
-# Imprimir el ID del trabajo de escaneo después de la validación
-logger.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
-
 # Modelo a utilizar
 MODELO = "claude-3-7-sonnet-latest"
+
+
+def validar_variables_ambiente():
+    """Valida que todas las variables de ambiente requeridas estén definidas."""
+    if not all(
+        [
+            ANTHROPIC_API_KEY,
+            GITHUB_TOKEN,
+            GITHUB_REPO_NAME,
+            GITHUB_COMMIT_SHA,
+            TITVO_SCAN_TASK_ID,
+        ]
+    ):
+        logger.error("Faltan variables de entorno.")
+        logger.error("Asegúrate de configurar las siguientes variables en el archivo .env:")
+        logger.error("- ANTHROPIC_API_KEY")
+        logger.error("- GITHUB_TOKEN")
+        logger.error("- GITHUB_REPO_NAME (formato: usuario/repositorio)")
+        logger.error("- GITHUB_COMMIT_SHA")
+        logger.error("- GITHUB_ASSIGNEE")
+        logger.error("- TITVO_SCAN_TASK_ID")
+        return False
+    return True
 
 
 def descargar_archivos_repositorio(github_instance):
@@ -328,29 +329,49 @@ def actualizar_estado_scan(scan_id, estado, issue_url=None):
         return False
 
 
+def finalizar_con_error(mensaje, scan_id=None):
+    """Actualiza el estado a ERROR en DynamoDB y termina el script con código 1."""
+    logger.error(mensaje)
+    if scan_id:
+        actualizar_estado_scan(scan_id, "ERROR")
+    sys.exit(1)
+
+
 def main():
     """Función principal para obtener una respuesta de Claude."""
     logger.info("Iniciando análisis de seguridad")
+    
+    # Validar variables de ambiente
+    if not validar_variables_ambiente():
+        finalizar_con_error("Faltan variables de ambiente requeridas")
+    
+    # Imprimir el ID del trabajo de escaneo después de la validación
+    logger.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
 
     # Obtener el item de escaneo desde DynamoDB
     item_scan = obtener_item_scan(TITVO_SCAN_TASK_ID)
     if not item_scan:
-        logger.error("No se pudo obtener la información del escaneo desde DynamoDB")
-        sys.exit(1)
+        finalizar_con_error(
+            "No se pudo obtener la información del escaneo desde DynamoDB", 
+            TITVO_SCAN_TASK_ID
+        )
 
     # Actualizar el estado a IN_PROGRESS
     if not actualizar_estado_scan(TITVO_SCAN_TASK_ID, "IN_PROGRESS"):
-        logger.error("No se pudo actualizar el estado del escaneo a IN_PROGRESS")
-        sys.exit(1)
+        finalizar_con_error(
+            "No se pudo actualizar el estado del escaneo a IN_PROGRESS", 
+            TITVO_SCAN_TASK_ID
+        )
 
     # Inicializar el cliente de GitHub
     github_client = Github(GITHUB_TOKEN)
 
     # Descargar archivos del repositorio
     if not descargar_archivos_repositorio(github_client):
-        logger.error("No se pudieron descargar los archivos del repositorio.")
-        actualizar_estado_scan(TITVO_SCAN_TASK_ID, "ERROR")
-        sys.exit(1)
+        finalizar_con_error(
+            "No se pudieron descargar los archivos del repositorio.", 
+            TITVO_SCAN_TASK_ID
+        )
 
     # Obtener el contenido de los archivos
     contenido_archivos = obtener_contenido_archivos()
@@ -419,9 +440,10 @@ def main():
 
     except Exception as e:
         logger.exception(e)
-        # Actualizar el estado a ERROR
-        actualizar_estado_scan(TITVO_SCAN_TASK_ID, "ERROR")
-        sys.exit(1)
+        finalizar_con_error(
+            f"Error durante el análisis: {str(e)}", 
+            TITVO_SCAN_TASK_ID
+        )
 
 
 if __name__ == "__main__":
