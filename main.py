@@ -16,7 +16,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
-logger = logging.getLogger("github_security_scan")
+LOGGER = logging.getLogger("github_security_scan")
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
@@ -44,14 +44,14 @@ def validate_environment_variables():
             TITVO_SCAN_TASK_ID,
         ]
     ):
-        logger.error("Faltan variables de entorno.")
-        logger.error("Asegúrate de configurar las siguientes variables en el archivo .env:")
-        logger.error("- ANTHROPIC_API_KEY")
-        logger.error("- GITHUB_TOKEN")
-        logger.error("- GITHUB_REPO_NAME (formato: usuario/repositorio)")
-        logger.error("- GITHUB_COMMIT_SHA")
-        logger.error("- GITHUB_ASSIGNEE")
-        logger.error("- TITVO_SCAN_TASK_ID")
+        LOGGER.error("Faltan variables de entorno.")
+        LOGGER.error("Asegúrate de configurar las siguientes variables en el archivo .env:")
+        LOGGER.error("- ANTHROPIC_API_KEY")
+        LOGGER.error("- GITHUB_TOKEN")
+        LOGGER.error("- GITHUB_REPO_NAME (formato: usuario/repositorio)")
+        LOGGER.error("- GITHUB_COMMIT_SHA")
+        LOGGER.error("- GITHUB_ASSIGNEE")
+        LOGGER.error("- TITVO_SCAN_TASK_ID")
         return False
     return True
 
@@ -61,11 +61,11 @@ def download_repository_files(github_instance):
     try:
         # Obtener el repositorio
         repo = github_instance.get_repo(GITHUB_REPO_NAME)
-        logger.info("Accediendo al repositorio: %s", GITHUB_REPO_NAME)
+        LOGGER.info("Accediendo al repositorio: %s", GITHUB_REPO_NAME)
 
         # Obtener el commit específico
         commit = repo.get_commit(GITHUB_COMMIT_SHA)
-        logger.info("Obteniendo archivos del commit: %s", GITHUB_COMMIT_SHA)
+        LOGGER.info("Obteniendo archivos del commit: %s", GITHUB_COMMIT_SHA)
 
         # Crear directorio para los archivos si no existe
         os.makedirs("repo_files", exist_ok=True)
@@ -90,26 +90,26 @@ def download_repository_files(github_instance):
                 with open(f"repo_files/{file.filename}", "w", encoding="utf-8") as f:
                     f.write(file_content)
 
-                logger.info("Archivo descargado: %s", file.filename)
+                LOGGER.info("Archivo descargado: %s", file.filename)
 
             # pylint: disable=broad-exception-caught
             except Exception as e:
                 # pylint: enable=broad-exception-caught
-                logger.error("Error al descargar %s: %s", file.filename, e)
+                LOGGER.error("Error al descargar %s: %s", file.filename, e)
 
         return True
 
     # pylint: disable=broad-exception-caught
     except Exception as e:
         # pylint: enable=broad-exception-caught
-        logger.error("Error al acceder al repositorio: %s", e)
+        LOGGER.error("Error al acceder al repositorio: %s", e)
         return False
 
 
 def get_files_content():
     """Obtiene el contenido de todos los archivos descargados."""
     contenido_archivos = ""
-    logger.info("Obteniendo contenido de los archivos descargados")
+    LOGGER.info("Obteniendo contenido de los archivos descargados")
 
     # Recorrer el directorio repo_files
     for root, _, files in os.walk("repo_files"):
@@ -129,13 +129,13 @@ def get_files_content():
                 contenido_archivos += (
                     f"\n\n**Archivo: {ruta_relativa}**\n```\n{contenido}\n```"
                 )
-                logger.debug(
+                LOGGER.debug(
                     "Contenido del archivo %s añadido al prompt", ruta_relativa
                 )
             # pylint: disable=broad-exception-caught
             except Exception as e:
                 # pylint: enable=broad-exception-caught
-                logger.error("Error al leer el archivo %s: %s", ruta_relativa, e)
+                LOGGER.error("Error al leer el archivo %s: %s", ruta_relativa, e)
                 contenido_archivos += (
                     f"\n\n**Archivo: {ruta_relativa}**\n```\n"
                     f"Error al leer el archivo: {e}\n```"
@@ -147,7 +147,7 @@ def get_files_content():
 def create_github_issue(analysis, commit_sha, github_instance):
     """Crea un issue en GitHub con el análisis de vulnerabilidades."""
     try:
-        logger.info("Creando issue en GitHub con el análisis de vulnerabilidades")
+        LOGGER.info("Creando issue en GitHub con el análisis de vulnerabilidades")
 
         # Obtener el repositorio
         repo = github_instance.get_repo(GITHUB_REPO_NAME)
@@ -172,21 +172,21 @@ def create_github_issue(analysis, commit_sha, github_instance):
         try:
             # Solo asignar si hay un usuario configurado
             if GITHUB_ASSIGNEE:
-                logger.info(
+                LOGGER.info(
                     "Asignando issue al usuario configurado: %s", GITHUB_ASSIGNEE
                 )
                 # Asignar el issue
                 issue.add_to_assignees(GITHUB_ASSIGNEE)
-                logger.info("Issue asignado a %s", GITHUB_ASSIGNEE)
+                LOGGER.info("Issue asignado a %s", GITHUB_ASSIGNEE)
 
         except Exception as e:
-            logger.warning("Error al asignar el issue: %s", e)
-            logger.warning("Tipo de error: %s", type(e).__name__)
+            LOGGER.warning("Error al asignar el issue: %s", e)
+            LOGGER.warning("Tipo de error: %s", type(e).__name__)
 
         return issue.html_url
 
     except Exception as e:
-        logger.error("Error al crear el issue en GitHub: %s", e)
+        LOGGER.error("Error al crear el issue en GitHub: %s", e)
         return None
 
 
@@ -249,11 +249,11 @@ def get_table_name():
 
         # Extraer el valor del parámetro
         nombre_tabla = response["Parameter"]["Value"]
-        logger.info("Nombre de tabla DynamoDB obtenido: %s", nombre_tabla)
+        LOGGER.info("Nombre de tabla DynamoDB obtenido: %s", nombre_tabla)
 
         return nombre_tabla
     except ClientError as e:
-        logger.error(
+        LOGGER.error(
             "Error al obtener el nombre de la tabla desde Parameter Store: %s", e
         )
         return None
@@ -265,7 +265,7 @@ def get_scan_item(scan_id):
         # Obtener el nombre de la tabla
         nombre_tabla = get_table_name()
         if not nombre_tabla:
-            logger.error("No se pudo obtener el nombre de la tabla DynamoDB")
+            LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
             return None
 
         # Inicializar el cliente de DynamoDB
@@ -277,13 +277,13 @@ def get_scan_item(scan_id):
 
         # Verificar si el item existe
         if "Item" in response:
-            logger.info("Item de escaneo obtenido correctamente: %s", scan_id)
+            LOGGER.info("Item de escaneo obtenido correctamente: %s", scan_id)
             return response["Item"]
         else:
-            logger.error("No se encontró el item con scan_id: %s", scan_id)
+            LOGGER.error("No se encontró el item con scan_id: %s", scan_id)
             return None
     except ClientError as e:
-        logger.error("Error al obtener el item desde DynamoDB: %s", e)
+        LOGGER.error("Error al obtener el item desde DynamoDB: %s", e)
         return None
 
 
@@ -293,7 +293,7 @@ def update_scan_status(scan_id, status, issue_url=None):
         # Obtener el nombre de la tabla
         nombre_tabla = get_table_name()
         if not nombre_tabla:
-            logger.error("No se pudo obtener el nombre de la tabla DynamoDB")
+            LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
             return False
 
         # Inicializar el cliente de DynamoDB
@@ -314,7 +314,7 @@ def update_scan_status(scan_id, status, issue_url=None):
         if issue_url:
             update_expression += ", issue_url = :i"
             expression_attribute_values[":i"] = issue_url
-            logger.info("Se incluirá la URL del issue en la actualización: %s", issue_url)
+            LOGGER.info("Se incluirá la URL del issue en la actualización: %s", issue_url)
 
         # Actualizar el item
         tabla.update_item(
@@ -328,17 +328,17 @@ def update_scan_status(scan_id, status, issue_url=None):
         log_message = f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
         if issue_url:
             log_message += f", issue_url: {issue_url}"
-        logger.info(log_message)
+        LOGGER.info(log_message)
         
         return True
     except ClientError as e:
-        logger.error("Error al actualizar el estado en DynamoDB: %s", e)
+        LOGGER.error("Error al actualizar el estado en DynamoDB: %s", e)
         return False
 
 
 def exit_with_error(message, scan_id=None):
     """Actualiza el estado a ERROR en DynamoDB y termina el script con código 1."""
-    logger.error(message)
+    LOGGER.error(message)
     if scan_id:
         update_scan_status(scan_id, "ERROR")
     sys.exit(1)
@@ -346,14 +346,14 @@ def exit_with_error(message, scan_id=None):
 
 def main():
     """Función principal para obtener una respuesta de Claude."""
-    logger.info("Iniciando análisis de seguridad")
+    LOGGER.info("Iniciando análisis de seguridad")
     
     # Validar variables de ambiente
     if not validate_environment_variables():
         exit_with_error("Faltan variables de ambiente requeridas")
     
     # Imprimir el ID del trabajo de escaneo después de la validación
-    logger.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
+    LOGGER.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
 
     # Obtener el item de escaneo desde DynamoDB
     item_scan = get_scan_item(TITVO_SCAN_TASK_ID)
@@ -385,7 +385,7 @@ def main():
 
     # Inicializar el cliente de Anthropic
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
-    logger.info("Enviando código para análisis")
+    LOGGER.info("Enviando código para análisis")
 
     try:
         user_prompt = f"""
@@ -414,22 +414,22 @@ def main():
 
         # Obtener el análisis de Claude
         analisis = respuesta.content[0].text
-        logger.info("Análisis de seguridad recibido de Claude")
+        LOGGER.info("Análisis de seguridad recibido de Claude")
 
         # Mostrar la respuesta
-        logger.info("Respuesta de Claude:\n%s", analisis)
+        LOGGER.info("Respuesta de Claude:\n%s", analisis)
 
         # Verificar si el commit es seguro
         if not is_commit_safe(analisis):
-            logger.error(
+            LOGGER.error(
                 "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
             )
             
             # Crear un issue en GitHub solo si se detectan vulnerabilidades
             issue_url = create_github_issue(analisis, GITHUB_COMMIT_SHA, github_client)
             if issue_url:
-                logger.info("Se ha creado un issue con el análisis: %s", issue_url)
-                logger.error(
+                LOGGER.info("Se ha creado un issue con el análisis: %s", issue_url)
+                LOGGER.error(
                     "Revisa el issue creado en GitHub para más detalles: %s", issue_url
                 )
             
@@ -439,14 +439,14 @@ def main():
             # No usamos sys.exit(1) aquí para no indicar un error del script
             # Solo indicamos que el commit tiene vulnerabilidades
         else:
-            logger.info(
+            LOGGER.info(
                 "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."
             )
             # Actualizar el estado a COMPLETED sin crear issue
             update_scan_status(TITVO_SCAN_TASK_ID, "COMPLETED")
 
     except Exception as e:
-        logger.exception(e)
+        LOGGER.exception(e)
         exit_with_error(
             f"Error durante el análisis: {str(e)}", 
             TITVO_SCAN_TASK_ID
