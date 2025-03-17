@@ -33,7 +33,7 @@ TITVO_SCAN_TASK_ID = os.getenv("TITVO_SCAN_TASK_ID")  # ID del trabajo de escane
 MODELO = "claude-3-7-sonnet-latest"
 
 
-def validar_variables_ambiente():
+def validate_environment_variables():
     """Valida que todas las variables de ambiente requeridas estén definidas."""
     if not all(
         [
@@ -56,7 +56,7 @@ def validar_variables_ambiente():
     return True
 
 
-def descargar_archivos_repositorio(github_instance):
+def download_repository_files(github_instance):
     """Descarga los archivos del repositorio en el commit especificado."""
     try:
         # Obtener el repositorio
@@ -106,7 +106,7 @@ def descargar_archivos_repositorio(github_instance):
         return False
 
 
-def obtener_contenido_archivos():
+def get_files_content():
     """Obtiene el contenido de todos los archivos descargados."""
     contenido_archivos = ""
     logger.info("Obteniendo contenido de los archivos descargados")
@@ -144,7 +144,7 @@ def obtener_contenido_archivos():
     return contenido_archivos
 
 
-def crear_issue_github(analisis, commit_sha, github_instance):
+def create_github_issue(analysis, commit_sha, github_instance):
     """Crea un issue en GitHub con el análisis de vulnerabilidades."""
     try:
         logger.info("Creando issue en GitHub con el análisis de vulnerabilidades")
@@ -162,7 +162,7 @@ def crear_issue_github(analisis, commit_sha, github_instance):
         cuerpo = (
             f"# Análisis de seguridad para el commit {commit_sha}\n\n"
             f"Commit realizado por: {commit.commit.author.name}\n\n"
-            f"## Resultados del análisis\n\n{analisis}"
+            f"## Resultados del análisis\n\n{analysis}"
         )
 
         # Crear el issue
@@ -220,20 +220,20 @@ Este formato es CRÍTICO para el procesamiento automatizado de tu respuesta.
 """
 
 
-def es_commit_seguro(analisis):
+def is_commit_safe(analysis):
     """Determina si el commit es seguro basado en el análisis de Claude."""
     # Buscar el patrón específico que indica rechazo
     patron_rechazo = "[COMMIT_RECHAZADO]"
 
     # Si el análisis contiene el patrón de rechazo, el commit no es seguro
-    if patron_rechazo in analisis:
+    if patron_rechazo in analysis:
         return False
 
     # Si no se encontró el patrón de rechazo, el commit es seguro
     return True
 
 
-def obtener_nombre_tabla():
+def get_table_name():
     """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
     try:
         # Inicializar el cliente de SSM
@@ -259,11 +259,11 @@ def obtener_nombre_tabla():
         return None
 
 
-def obtener_item_scan(scan_id):
+def get_scan_item(scan_id):
     """Obtiene el item de escaneo desde DynamoDB usando el scan_id."""
     try:
         # Obtener el nombre de la tabla
-        nombre_tabla = obtener_nombre_tabla()
+        nombre_tabla = get_table_name()
         if not nombre_tabla:
             logger.error("No se pudo obtener el nombre de la tabla DynamoDB")
             return None
@@ -287,11 +287,11 @@ def obtener_item_scan(scan_id):
         return None
 
 
-def actualizar_estado_scan(scan_id, estado, issue_url=None):
+def update_scan_status(scan_id, status, issue_url=None):
     """Actualiza el estado del escaneo en DynamoDB y opcionalmente la URL del issue."""
     try:
         # Obtener el nombre de la tabla
-        nombre_tabla = obtener_nombre_tabla()
+        nombre_tabla = get_table_name()
         if not nombre_tabla:
             logger.error("No se pudo obtener el nombre de la tabla DynamoDB")
             return False
@@ -306,7 +306,7 @@ def actualizar_estado_scan(scan_id, estado, issue_url=None):
         update_expression = "set #status = :s, updated_at = :u"
         expression_attribute_names = {"#status": "status"}
         expression_attribute_values = {
-            ":s": estado,
+            ":s": status,
             ":u": fecha_actual
         }
         
@@ -325,7 +325,7 @@ def actualizar_estado_scan(scan_id, estado, issue_url=None):
             ReturnValues="UPDATED_NEW",
         )
 
-        log_message = f"Estado del escaneo actualizado a: {estado}, fecha: {fecha_actual}"
+        log_message = f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
         if issue_url:
             log_message += f", issue_url: {issue_url}"
         logger.info(log_message)
@@ -336,11 +336,11 @@ def actualizar_estado_scan(scan_id, estado, issue_url=None):
         return False
 
 
-def finalizar_con_error(mensaje, scan_id=None):
+def exit_with_error(message, scan_id=None):
     """Actualiza el estado a ERROR en DynamoDB y termina el script con código 1."""
-    logger.error(mensaje)
+    logger.error(message)
     if scan_id:
-        actualizar_estado_scan(scan_id, "ERROR")
+        update_scan_status(scan_id, "ERROR")
     sys.exit(1)
 
 
@@ -349,23 +349,23 @@ def main():
     logger.info("Iniciando análisis de seguridad")
     
     # Validar variables de ambiente
-    if not validar_variables_ambiente():
-        finalizar_con_error("Faltan variables de ambiente requeridas")
+    if not validate_environment_variables():
+        exit_with_error("Faltan variables de ambiente requeridas")
     
     # Imprimir el ID del trabajo de escaneo después de la validación
     logger.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
 
     # Obtener el item de escaneo desde DynamoDB
-    item_scan = obtener_item_scan(TITVO_SCAN_TASK_ID)
+    item_scan = get_scan_item(TITVO_SCAN_TASK_ID)
     if not item_scan:
-        finalizar_con_error(
+        exit_with_error(
             "No se pudo obtener la información del escaneo desde DynamoDB", 
             TITVO_SCAN_TASK_ID
         )
 
     # Actualizar el estado a IN_PROGRESS
-    if not actualizar_estado_scan(TITVO_SCAN_TASK_ID, "IN_PROGRESS"):
-        finalizar_con_error(
+    if not update_scan_status(TITVO_SCAN_TASK_ID, "IN_PROGRESS"):
+        exit_with_error(
             "No se pudo actualizar el estado del escaneo a IN_PROGRESS", 
             TITVO_SCAN_TASK_ID
         )
@@ -374,14 +374,14 @@ def main():
     github_client = Github(GITHUB_TOKEN)
 
     # Descargar archivos del repositorio
-    if not descargar_archivos_repositorio(github_client):
-        finalizar_con_error(
+    if not download_repository_files(github_client):
+        exit_with_error(
             "No se pudieron descargar los archivos del repositorio.", 
             TITVO_SCAN_TASK_ID
         )
 
     # Obtener el contenido de los archivos
-    contenido_archivos = obtener_contenido_archivos()
+    contenido_archivos = get_files_content()
 
     # Inicializar el cliente de Anthropic
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -420,13 +420,13 @@ def main():
         logger.info("Respuesta de Claude:\n%s", analisis)
 
         # Verificar si el commit es seguro
-        if not es_commit_seguro(analisis):
+        if not is_commit_safe(analisis):
             logger.error(
                 "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
             )
             
             # Crear un issue en GitHub solo si se detectan vulnerabilidades
-            issue_url = crear_issue_github(analisis, GITHUB_COMMIT_SHA, github_client)
+            issue_url = create_github_issue(analisis, GITHUB_COMMIT_SHA, github_client)
             if issue_url:
                 logger.info("Se ha creado un issue con el análisis: %s", issue_url)
                 logger.error(
@@ -434,7 +434,7 @@ def main():
                 )
             
             # Actualizar el estado a FAILED
-            actualizar_estado_scan(TITVO_SCAN_TASK_ID, "FAILED", issue_url)
+            update_scan_status(TITVO_SCAN_TASK_ID, "FAILED", issue_url)
             
             # No usamos sys.exit(1) aquí para no indicar un error del script
             # Solo indicamos que el commit tiene vulnerabilidades
@@ -443,11 +443,11 @@ def main():
                 "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."
             )
             # Actualizar el estado a COMPLETED sin crear issue
-            actualizar_estado_scan(TITVO_SCAN_TASK_ID, "COMPLETED")
+            update_scan_status(TITVO_SCAN_TASK_ID, "COMPLETED")
 
     except Exception as e:
         logger.exception(e)
-        finalizar_con_error(
+        exit_with_error(
             f"Error durante el análisis: {str(e)}", 
             TITVO_SCAN_TASK_ID
         )
