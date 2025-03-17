@@ -11,6 +11,7 @@ Este proyecto contiene un script que analiza automáticamente commits de GitHub 
 - Asignación automática de issues a un usuario específico
 - Seguimiento del estado de los escaneos en DynamoDB
 - Obtención de configuración desde AWS Parameter Store
+- System prompt configurable a través de Parameter Store
 
 ## Requisitos
 
@@ -96,11 +97,26 @@ El script utiliza una tabla DynamoDB existente para almacenar y actualizar el es
 
 El nombre de la tabla de DynamoDB se obtiene desde AWS Parameter Store con la clave `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`.
 
+### Integración con Parameter Store
+
+El script utiliza AWS Parameter Store para obtener configuración dinámica:
+
+1. El nombre de la tabla DynamoDB se obtiene desde el parámetro `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`
+2. El system prompt para Claude se obtiene desde el parámetro `/tvo/security-scan/prod/github-security-scan/system-prompt` (OBLIGATORIO)
+
+Esto permite modificar el comportamiento del analizador sin necesidad de cambiar el código, facilitando:
+- Ajustes en las instrucciones para Claude
+- Cambios en el formato de respuesta esperado
+- Actualización de criterios de análisis de seguridad
+
+> [!IMPORTANT]
+> El parámetro del system prompt es obligatorio para el funcionamiento del script. Si no se puede obtener, el script fallará con un error.
+
 ### Personalización
 
-El script utiliza dos prompts principales que puedes modificar en el código:
+El script utiliza dos prompts principales:
 
-- `SYSTEM_PROMPT`: Define las instrucciones y comportamiento para Claude
+- `system_prompt`: Define las instrucciones y comportamiento para Claude (obtenido desde Parameter Store)
 - `user_prompt`: Define la consulta específica que se envía a Claude con el código a analizar
 
 ## Formato de respuesta

@@ -33,6 +33,43 @@ TITVO_SCAN_TASK_ID = os.getenv("TITVO_SCAN_TASK_ID")  # ID del trabajo de escane
 MODELO = "claude-3-7-sonnet-latest"
 
 
+def get_ssm_parameter(parameter_name):
+    """Obtiene un parámetro desde AWS Parameter Store."""
+    try:
+        # Inicializar el cliente de SSM
+        ssm = boto3.client("ssm")
+        
+        # Obtener el parámetro
+        response = ssm.get_parameter(
+            Name=parameter_name,
+            WithDecryption=False,
+        )
+        
+        # Extraer el valor del parámetro
+        parameter_value = response["Parameter"]["Value"]
+        LOGGER.info("Parámetro obtenido correctamente: %s", parameter_name)
+        
+        return parameter_value
+    except ClientError as e:
+        LOGGER.error("Error al obtener el parámetro %s desde Parameter Store: %s", parameter_name, e)
+        return None
+
+
+def get_system_prompt():
+    """Obtiene el system prompt desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/github-security-scan/system-prompt"
+    
+    system_prompt = get_ssm_parameter(param_name)
+    
+    if not system_prompt:
+        LOGGER.error("No se pudo obtener el system prompt desde Parameter Store")
+        LOGGER.error("Este parámetro es obligatorio para el funcionamiento del script")
+        return None
+    
+    return system_prompt
+
+
 def validate_environment_variables():
     """Valida que todas las variables de ambiente requeridas estén definidas."""
     if not all(
@@ -195,58 +232,6 @@ def create_github_issue(analysis, commit_sha, github_instance):
         return None
 
 
-# Prompt de sistema - Modifica esto según tus necesidades
-SYSTEM_PROMPT = """
-Eres Claude, un experto en seguridad informática y ciberseguridad.
-Tu especialidad es el análisis de vulnerabilidades en código fuente, especialmente en código que no es capaz de detectarse en un análisis SAST.
-Tu objetivo es analizar el código fuente de un repositorio y proporcionar un resumen de las vulnerabilidades encontradas.
-
-TIPS:
-- Se está usando github como repositorio.
-- Las versiones del lenguaje de programación deben considerarse con severidad baja.
-- Las versiones de frameworks deben considerarse con severidad baja.
-- Solo debes considerar la seguridad y no errores de programación.
-- El escaneo de versiones de dependencias las realizará otro servicio.
-- Solo debes validar que los secretos o variables del pipeline no se usen de forma incorrecta.
-
-Ejemplo de tipos de vulnerabilidades que debes buscar:
-- Código backdoor
-- Errores que podrían filtrar información sensible
-- Filtración de datos de usuarios
-- Filtración de secretos
-- OWASP Top 10
-
-FORMATO DE RESPUESTA:
-1. SIEMPRE debes comenzar tu respuesta con uno de estos dos patrones:
-   - "[COMMIT_RECHAZADO] - Este commit contiene vulnerabilidades de seguridad" (si encuentras vulnerabilidades de severidad media, alta o crítica)
-   - "[COMMIT_APROBADO] - Este commit no contiene vulnerabilidades de seguridad significativas" (si no encuentras vulnerabilidades o solo encuentras de severidad baja)
-
-2. Luego, proporciona un análisis detallado de las vulnerabilidades encontradas, organizadas por tipo y severidad. El formato debe ser el siguiente:
-
-## <Número de la vulnerabilidad>. Nombre de la vulnerabilidad
-
-**Severidad: <severidad de la vulnerabilidad>**
-
-### Descripción del problema
-
-<Descripción del problema>
-
-### Ubicación exacta (archivo y línea)
-
-<Ubicación exacta (archivo y línea)>
-
-### Impacto potencial
-
-<Impacto potencial>
-
-### Recomendación para solucionarlo
-
-<Recomendación para solucionarlo>
-
-Este formato es CRÍTICO para el procesamiento automatizado de tu respuesta.
-"""
-
-
 def is_commit_safe(analysis):
     """Determina si el commit es seguro basado en el análisis de Claude."""
     # Buscar el patrón específico que indica rechazo
@@ -262,28 +247,10 @@ def is_commit_safe(analysis):
 
 def get_table_name():
     """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
-    try:
-        # Inicializar el cliente de SSM
-        ssm = boto3.client("ssm")
-
-        # Obtener el parámetro
-        param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
-        param_name = f"{param_path}/task-trigger/dynamo-task-table-name"
-        response = ssm.get_parameter(
-            Name=param_name,
-            WithDecryption=False,
-        )
-
-        # Extraer el valor del parámetro
-        nombre_tabla = response["Parameter"]["Value"]
-        LOGGER.info("Nombre de tabla DynamoDB obtenido: %s", nombre_tabla)
-
-        return nombre_tabla
-    except ClientError as e:
-        LOGGER.error(
-            "Error al obtener el nombre de la tabla desde Parameter Store: %s", e
-        )
-        return None
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/task-trigger/dynamo-task-table-name"
+    
+    return get_ssm_parameter(param_name)
 
 
 def get_scan_item(scan_id):
@@ -410,6 +377,16 @@ def main():
     # Obtener el contenido de los archivos
     contenido_archivos = get_files_content()
 
+    # Obtener el system prompt desde Parameter Store
+    system_prompt = get_system_prompt()
+    if not system_prompt:
+        exit_with_error(
+            "No se pudo obtener el system prompt desde Parameter Store. "
+            "Este parámetro es obligatorio.", 
+            TITVO_SCAN_TASK_ID
+        )
+    LOGGER.info("System prompt obtenido correctamente")
+
     # Inicializar el cliente de Anthropic
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     LOGGER.info("Enviando código para análisis")
@@ -435,7 +412,7 @@ def main():
             model=MODELO,
             max_tokens=4000,
             temperature=0.7,
-            system=SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
 

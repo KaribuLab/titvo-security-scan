@@ -111,6 +111,13 @@ Para ejecutar esta solución, necesitas:
 3. Un parámetro en Parameter Store:
    - Nombre: `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`
    - Valor: Nombre de la tabla DynamoDB existente
+   
+4. Un parámetro en Parameter Store para el system prompt (OBLIGATORIO):
+   - Nombre: `/tvo/security-scan/prod/github-security-scan/system-prompt`
+   - Valor: Texto con las instrucciones para Claude (system prompt)
+   - Tipo: String
+   - Este parámetro puede ser bastante extenso, ya que contiene todas las instrucciones para el modelo de IA
+   - IMPORTANTE: Este parámetro es obligatorio y el script fallará si no puede obtenerlo
 
 ## Flujo de ejecución
 
