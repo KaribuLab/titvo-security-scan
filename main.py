@@ -313,24 +313,19 @@ def update_scan_status(scan_id, status, result=None):
         # Inicializar el cliente de DynamoDB
         dynamodb = boto3.resource("dynamodb")
         tabla = dynamodb.Table(nombre_tabla)
-        
+
         fecha_actual = datetime.now(pytz.utc).isoformat()
-        
+
         # Preparar la expresión de actualización y los valores
         update_expression = "set #status = :s, updated_at = :u"
         expression_attribute_names = {"#status": "status"}
-        expression_attribute_values = {
-            ":s": status,
-            ":u": fecha_actual
-        }
-        
+        expression_attribute_values = {":s": status, ":u": fecha_actual}
+
         # Si se proporciona el resultado, incluirlo en la actualización
         if result is not None:
             update_expression += ", result = :r"
             expression_attribute_values[":r"] = result
-            LOGGER.info(
-                "Se incluirá el resultado en la actualización: %s", result
-            )
+            LOGGER.info("Se incluirá el resultado en la actualización: %s", result)
 
         # Actualizar el item
         tabla.update_item(
@@ -341,11 +336,13 @@ def update_scan_status(scan_id, status, result=None):
             ReturnValues="UPDATED_NEW",
         )
 
-        log_message = f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
+        log_message = (
+            f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
+        )
         if result is not None:
             log_message += f", result: {result}"
         LOGGER.info(log_message)
-        
+
         return True
     except ClientError as e:
         LOGGER.error("Error al actualizar el estado en DynamoDB: %s", e)
@@ -371,7 +368,7 @@ def decrypt(data):
             return None
         key = b64decode(secret)
         cipher = AES.new(key, AES.MODE_ECB)
-        decrypted_data = unpad(cipher.decrypt(data.encode('utf-8')), AES.block_size)
+        decrypted_data = unpad(cipher.decrypt(data.encode("utf-8")), AES.block_size)
         return decrypted_data.decode("utf-8")
     except ClientError as e:
         LOGGER.exception(e)
@@ -487,9 +484,13 @@ def main():
                     )
 
                 # Actualizar el estado a FAILED
-                update_scan_status(TITVO_SCAN_TASK_ID, "FAILED", {
-                    "issue_url": issue_url,
-                })
+                update_scan_status(
+                    TITVO_SCAN_TASK_ID,
+                    "FAILED",
+                    {
+                        "issue_url": issue_url,
+                    },
+                )
 
                 # No usamos sys.exit(1) aquí para no indicar un error del script
                 # Solo indicamos que el commit tiene vulnerabilidades
