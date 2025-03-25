@@ -115,12 +115,12 @@ def github_download_repository_files(
     """Descarga los archivos del repositorio en el commit especificado."""
     try:
         # Obtener el repositorio
-        repo = github_instance.get_repo(github_repo_name)
         LOGGER.info("Accediendo al repositorio: %s", github_repo_name)
+        repo = github_instance.get_repo(github_repo_name)
 
         # Obtener el commit específico
-        commit = repo.get_commit(github_commit_sha)
         LOGGER.info("Obteniendo archivos del commit: %s", github_commit_sha)
+        commit = repo.get_commit(github_commit_sha)
 
         # Crear directorio para los archivos si no existe
         os.makedirs("repo_files", exist_ok=True)
