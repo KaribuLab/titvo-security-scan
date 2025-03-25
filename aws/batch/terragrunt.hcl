@@ -30,6 +30,7 @@ dependency parameters {
       "/tvo/security-scan/prod/infra/vpc-id"                = "vpc-000000000000000"
       "/tvo/security-scan/prod/infra/subnet1"               = "subnet-0c4b3b6b1b7b3b3b3"
       "/tvo/security-scan/prod/infra/dynamo-task-table-arn" = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-task-table-prod"
+      "/tvo/security-scan/prod/infra/secret-manager-arn"    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:/tvo/security-scan/prod"
     }
   }
 }
@@ -73,6 +74,15 @@ inputs = {
         ],
         "Resource" : [
           dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-task-table-arn"],
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "secretsmanager:GetSecretValue"
+        ],
+        "Resource" : [
+          "${dependency.parameters.outputs.parameters["${local.base_path}/infra/secret-manager-arn"]}"
         ]
       }
     ]
