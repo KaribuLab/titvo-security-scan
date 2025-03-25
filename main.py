@@ -368,7 +368,9 @@ def decrypt(data):
             return None
         key = b64decode(secret)
         cipher = AES.new(key, AES.MODE_ECB)
-        decrypted_data = unpad(cipher.decrypt(data.encode("utf-8")), AES.block_size)
+        decrypted_data = unpad(
+            cipher.decrypt(b64decode(data)), AES.block_size
+        )
         return decrypted_data.decode("utf-8")
     except ClientError as e:
         LOGGER.exception(e)
