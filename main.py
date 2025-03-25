@@ -418,9 +418,9 @@ def main():
         if item_scan.get("source") == "github":
             # Inicializar el cliente de GitHub
             github_client = Github(decrypt(item_scan.get("args").get("githubToken")))
-            github_repo_name = item_scan.get("args").get("githubRepoName")
-            github_commit_sha = item_scan.get("args").get("githubCommitSha")
-            github_assignee = item_scan.get("args").get("githubAssignee")
+            github_repo_name = item_scan.get("args").get("github_repo_name")
+            github_commit_sha = item_scan.get("args").get("github_commit_sha")
+            github_assignee = item_scan.get("args").get("github_assignee")
             # Descargar archivos del repositorio
             if not github_download_repository_files(
                 github_client, github_repo_name, github_commit_sha
@@ -488,7 +488,7 @@ def main():
                     TITVO_SCAN_TASK_ID,
                     "FAILED",
                     {
-                        "issueUrl": issue_url,
+                        "issue_url": issue_url,
                     },
                 )
 
