@@ -488,7 +488,7 @@ def main():
                     TITVO_SCAN_TASK_ID,
                     "FAILED",
                     {
-                        "issue_url": issue_url,
+                        "issueUrl": issue_url,
                     },
                 )
 
