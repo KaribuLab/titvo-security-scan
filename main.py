@@ -323,7 +323,7 @@ def update_scan_status(scan_id, status, result=None):
 
         # Si se proporciona el resultado, incluirlo en la actualización
         if result is not None:
-            update_expression += ", result = :r"
+            update_expression += ", scan_result = :r"
             expression_attribute_values[":r"] = result
             LOGGER.info("Se incluirá el resultado en la actualización: %s", result)
 
