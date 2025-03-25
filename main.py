@@ -110,7 +110,7 @@ def validate_environment_variables():
 
 
 def github_download_repository_files(
-    github_instance, github_repo_name, github_commit_sha
+    github_instance: Github, github_repo_name: str, github_commit_sha: str
 ):
     """Descarga los archivos del repositorio en el commit especificado."""
     try:
@@ -420,9 +420,15 @@ def main():
         if item_scan.get("source") == "github":
             # Inicializar el cliente de GitHub
             github_client = Github(decrypt(item_scan.get("args").get("github_token")))
-            github_repo_name = item_scan.get("args").get("github_repo_name")
-            github_commit_sha = item_scan.get("args").get("github_commit_sha")
-            github_assignee = item_scan.get("args").get("github_assignee")
+            github_repo_name = item_scan.get("args").get("github_repo_name").replace(
+                '"', ""
+            )
+            github_commit_sha = item_scan.get("args").get("github_commit_sha").replace(
+                '"', ""
+            )
+            github_assignee = item_scan.get("args").get("github_assignee").replace(
+                '"', ""
+            )
             # Descargar archivos del repositorio
             if not github_download_repository_files(
                 github_client, github_repo_name, github_commit_sha
