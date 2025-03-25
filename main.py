@@ -1,6 +1,7 @@
 import os
 import sys
 import base64
+from base64 import b64decode
 import logging
 from datetime import datetime
 import boto3
@@ -9,6 +10,8 @@ from dotenv import load_dotenv
 from anthropic import Anthropic
 from github import Github
 import pytz
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 
 # Configurar el logger
 logging.basicConfig(
@@ -22,51 +25,71 @@ LOGGER = logging.getLogger("github_security_scan")
 load_dotenv()
 
 # Obtener las claves API desde el archivo .env
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GITHUB_REPO_NAME = os.getenv("GITHUB_REPO_NAME")
-GITHUB_COMMIT_SHA = os.getenv("GITHUB_COMMIT_SHA")
-GITHUB_ASSIGNEE = os.getenv("GITHUB_ASSIGNEE")  # Usuario para asignar issues
 TITVO_SCAN_TASK_ID = os.getenv("TITVO_SCAN_TASK_ID")  # ID del trabajo de escaneo
 
 # Modelo a utilizar
 MODELO = "claude-3-7-sonnet-latest"
 
+# Inicializar el cliente de SSM
+ssm = boto3.client("ssm")
+secret_manager = boto3.client("secretsmanager")
+
+
+def get_secret_manager_parameter(secret_name):
+    """Obtiene un parámetro desde AWS Secret Manager."""
+    try:
+        response = secret_manager.get_secret_value(SecretId=secret_name)
+        return response["SecretString"]
+    except ClientError as e:
+        LOGGER.error(
+            "Error al obtener el parámetro %s desde Secret Manager: %s", secret_name, e
+        )
+        return None
+
 
 def get_ssm_parameter(parameter_name):
     """Obtiene un parámetro desde AWS Parameter Store."""
     try:
-        # Inicializar el cliente de SSM
-        ssm = boto3.client("ssm")
-        
         # Obtener el parámetro
         response = ssm.get_parameter(
             Name=parameter_name,
             WithDecryption=False,
         )
-        
+
         # Extraer el valor del parámetro
         parameter_value = response["Parameter"]["Value"]
         LOGGER.info("Parámetro obtenido correctamente: %s", parameter_name)
-        
+
         return parameter_value
     except ClientError as e:
-        LOGGER.error("Error al obtener el parámetro %s desde Parameter Store: %s", parameter_name, e)
+        LOGGER.error(
+            "Error al obtener el parámetro %s desde Parameter Store: %s",
+            parameter_name,
+            e,
+        )
         return None
+
+
+def get_anthropic_api_key():
+    """Obtiene la clave de API de Anthropic desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/task-trigger/anthropic-api-key"
+
+    return get_ssm_parameter(param_name)
 
 
 def get_system_prompt():
     """Obtiene el system prompt desde Parameter Store."""
     param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
     param_name = f"{param_path}/github-security-scan/system-prompt"
-    
+
     system_prompt = get_ssm_parameter(param_name)
-    
+
     if not system_prompt:
         LOGGER.error("No se pudo obtener el system prompt desde Parameter Store")
         LOGGER.error("Este parámetro es obligatorio para el funcionamiento del script")
         return None
-    
+
     return system_prompt
 
 
@@ -74,35 +97,30 @@ def validate_environment_variables():
     """Valida que todas las variables de ambiente requeridas estén definidas."""
     if not all(
         [
-            ANTHROPIC_API_KEY,
-            GITHUB_TOKEN,
-            GITHUB_REPO_NAME,
-            GITHUB_COMMIT_SHA,
             TITVO_SCAN_TASK_ID,
         ]
     ):
         LOGGER.error("Faltan variables de entorno.")
-        LOGGER.error("Asegúrate de configurar las siguientes variables en el archivo .env:")
-        LOGGER.error("- ANTHROPIC_API_KEY")
-        LOGGER.error("- GITHUB_TOKEN")
-        LOGGER.error("- GITHUB_REPO_NAME (formato: usuario/repositorio)")
-        LOGGER.error("- GITHUB_COMMIT_SHA")
-        LOGGER.error("- GITHUB_ASSIGNEE")
+        LOGGER.error(
+            "Asegúrate de configurar las siguientes variables en el archivo .env:"
+        )
         LOGGER.error("- TITVO_SCAN_TASK_ID")
         return False
     return True
 
 
-def download_repository_files(github_instance):
+def github_download_repository_files(
+    github_instance, github_repo_name, github_commit_sha
+):
     """Descarga los archivos del repositorio en el commit especificado."""
     try:
         # Obtener el repositorio
-        repo = github_instance.get_repo(GITHUB_REPO_NAME)
-        LOGGER.info("Accediendo al repositorio: %s", GITHUB_REPO_NAME)
+        repo = github_instance.get_repo(github_repo_name)
+        LOGGER.info("Accediendo al repositorio: %s", github_repo_name)
 
         # Obtener el commit específico
-        commit = repo.get_commit(GITHUB_COMMIT_SHA)
-        LOGGER.info("Obteniendo archivos del commit: %s", GITHUB_COMMIT_SHA)
+        commit = repo.get_commit(github_commit_sha)
+        LOGGER.info("Obteniendo archivos del commit: %s", github_commit_sha)
 
         # Crear directorio para los archivos si no existe
         os.makedirs("repo_files", exist_ok=True)
@@ -111,7 +129,7 @@ def download_repository_files(github_instance):
         for file in commit.files:
             try:
                 # Obtener el contenido del archivo
-                content = repo.get_contents(file.filename, ref=GITHUB_COMMIT_SHA)
+                content = repo.get_contents(file.filename, ref=github_commit_sha)
 
                 # Crear directorios necesarios
                 os.makedirs(
@@ -143,7 +161,7 @@ def download_repository_files(github_instance):
         return False
 
 
-def get_files_content():
+def github_get_files_content():
     """Obtiene el contenido de todos los archivos descargados."""
     contenido_archivos = ""
     LOGGER.info("Obteniendo contenido de los archivos descargados")
@@ -181,13 +199,15 @@ def get_files_content():
     return contenido_archivos
 
 
-def create_github_issue(analysis, commit_sha, github_instance):
+def create_github_issue(
+    analysis, commit_sha, github_instance, github_repo_name, github_assignee
+):
     """Crea un issue en GitHub con el análisis de vulnerabilidades."""
     try:
         LOGGER.info("Creando issue en GitHub con el análisis de vulnerabilidades")
 
         # Obtener el repositorio
-        repo = github_instance.get_repo(GITHUB_REPO_NAME)
+        repo = github_instance.get_repo(github_repo_name)
 
         # Obtener el commit específico
         commit = repo.get_commit(commit_sha)
@@ -204,22 +224,18 @@ def create_github_issue(analysis, commit_sha, github_instance):
         )
 
         # Crear el issue con etiquetas de seguridad
-        issue = repo.create_issue(
-            title=title, 
-            body=body,
-            labels=["bug"]
-        )
+        issue = repo.create_issue(title=title, body=body, labels=["bug"])
 
         # Asignar el issue al usuario especificado en la variable de ambiente
         try:
             # Solo asignar si hay un usuario configurado
-            if GITHUB_ASSIGNEE:
+            if github_assignee:
                 LOGGER.info(
-                    "Asignando issue al usuario configurado: %s", GITHUB_ASSIGNEE
+                    "Asignando issue al usuario configurado: %s", github_assignee
                 )
                 # Asignar el issue
-                issue.add_to_assignees(GITHUB_ASSIGNEE)
-                LOGGER.info("Issue asignado a %s", GITHUB_ASSIGNEE)
+                issue.add_to_assignees(github_assignee)
+                LOGGER.info("Issue asignado a %s", github_assignee)
 
         except Exception as e:
             LOGGER.warning("Error al asignar el issue: %s", e)
@@ -249,7 +265,7 @@ def get_table_name():
     """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
     param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
     param_name = f"{param_path}/task-trigger/dynamo-task-table-name"
-    
+
     return get_ssm_parameter(param_name)
 
 
@@ -272,7 +288,11 @@ def get_scan_item(scan_id):
         # Verificar si el item existe
         if "Item" in response:
             LOGGER.info("Item de escaneo obtenido correctamente: %s", scan_id)
-            return response["Item"]
+            item = response["Item"]
+            return {
+                "args": item["args"],
+                "source": item["source"],
+            }
         else:
             LOGGER.error("No se encontró el item con scan_id: %s", scan_id)
             return None
@@ -293,22 +313,21 @@ def update_scan_status(scan_id, status, issue_url=None):
         # Inicializar el cliente de DynamoDB
         dynamodb = boto3.resource("dynamodb")
         tabla = dynamodb.Table(nombre_tabla)
-        
+
         fecha_actual = datetime.now(pytz.utc).isoformat()
-        
+
         # Preparar la expresión de actualización y los valores
         update_expression = "set #status = :s, updated_at = :u"
         expression_attribute_names = {"#status": "status"}
-        expression_attribute_values = {
-            ":s": status,
-            ":u": fecha_actual
-        }
-        
+        expression_attribute_values = {":s": status, ":u": fecha_actual}
+
         # Si se proporciona la URL del issue, incluirla en la actualización
         if issue_url:
             update_expression += ", issue_url = :i"
             expression_attribute_values[":i"] = issue_url
-            LOGGER.info("Se incluirá la URL del issue en la actualización: %s", issue_url)
+            LOGGER.info(
+                "Se incluirá la URL del issue en la actualización: %s", issue_url
+            )
 
         # Actualizar el item
         tabla.update_item(
@@ -319,11 +338,13 @@ def update_scan_status(scan_id, status, issue_url=None):
             ReturnValues="UPDATED_NEW",
         )
 
-        log_message = f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
+        log_message = (
+            f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
+        )
         if issue_url:
             log_message += f", issue_url: {issue_url}"
         LOGGER.info(log_message)
-        
+
         return True
     except ClientError as e:
         LOGGER.error("Error al actualizar el estado en DynamoDB: %s", e)
@@ -338,14 +359,32 @@ def exit_with_error(message, scan_id=None):
     sys.exit(1)
 
 
+def decrypt(data):
+    """Descifra un secreto desde AWS Secret Manager."""
+    try:
+        secret = get_secret_manager_parameter(
+            f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/aes_secret"
+        )
+        if not secret:
+            LOGGER.error("No se pudo obtener el secreto desde Secret Manager")
+            return None
+        key = b64decode(secret)
+        cipher = AES.new(key, AES.MODE_ECB)
+        decrypted_data = unpad(cipher.decrypt(data.encode('utf-8')), AES.block_size)
+        return decrypted_data.decode("utf-8")
+    except ClientError as e:
+        LOGGER.exception(e)
+        return None
+
+
 def main():
     """Función principal para obtener una respuesta de Claude."""
     LOGGER.info("Iniciando análisis de seguridad")
-    
+
     # Validar variables de ambiente
     if not validate_environment_variables():
         exit_with_error("Faltan variables de ambiente requeridas")
-    
+
     # Imprimir el ID del trabajo de escaneo después de la validación
     LOGGER.info("ID del trabajo de escaneo: %s", TITVO_SCAN_TASK_ID)
 
@@ -353,108 +392,120 @@ def main():
     item_scan = get_scan_item(TITVO_SCAN_TASK_ID)
     if not item_scan:
         exit_with_error(
-            "No se pudo obtener la información del escaneo desde DynamoDB", 
-            TITVO_SCAN_TASK_ID
+            "No se pudo obtener la información del escaneo desde DynamoDB",
+            TITVO_SCAN_TASK_ID,
         )
 
     # Actualizar el estado a IN_PROGRESS
     if not update_scan_status(TITVO_SCAN_TASK_ID, "IN_PROGRESS"):
         exit_with_error(
-            "No se pudo actualizar el estado del escaneo a IN_PROGRESS", 
-            TITVO_SCAN_TASK_ID
+            "No se pudo actualizar el estado del escaneo a IN_PROGRESS",
+            TITVO_SCAN_TASK_ID,
         )
-
-    # Inicializar el cliente de GitHub
-    github_client = Github(GITHUB_TOKEN)
-
-    # Descargar archivos del repositorio
-    if not download_repository_files(github_client):
-        exit_with_error(
-            "No se pudieron descargar los archivos del repositorio.", 
-            TITVO_SCAN_TASK_ID
-        )
-
-    # Obtener el contenido de los archivos
-    contenido_archivos = get_files_content()
-
     # Obtener el system prompt desde Parameter Store
     system_prompt = get_system_prompt()
     if not system_prompt:
         exit_with_error(
             "No se pudo obtener el system prompt desde Parameter Store. "
-            "Este parámetro es obligatorio.", 
-            TITVO_SCAN_TASK_ID
+            "Este parámetro es obligatorio.",
+            TITVO_SCAN_TASK_ID,
         )
     LOGGER.info("System prompt obtenido correctamente")
 
     # Inicializar el cliente de Anthropic
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=get_anthropic_api_key())
     LOGGER.info("Enviando código para análisis")
 
     try:
-        user_prompt = f"""
-        A continuación te proporciono el código fuente de un commit específico 
-        del repositorio {GITHUB_REPO_NAME} (commit: {GITHUB_COMMIT_SHA}).
-        
-        El formato de presentación es el siguiente:
-        - Cada archivo se presenta con su nombre en formato **Archivo: ruta/al/archivo**
-        - Seguido por el contenido del archivo dentro de un bloque de código markdown
-        
-        Analiza el código y proporciona un resumen de las vulnerabilidades encontradas en formato markdown, organizadas por tipo de vulnerabilidad y severidad.
-        
-        Recuerda que debes comenzar tu respuesta con el patrón [COMMIT_RECHAZADO] o [COMMIT_APROBADO] según corresponda.
-        
-        Código fuente a analizar:{contenido_archivos}
-        """
-
-        # Enviar la solicitud a Claude
-        respuesta = client.messages.create(
-            model=MODELO,
-            max_tokens=4000,
-            temperature=0.7,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-
-        # Obtener el análisis de Claude
-        analisis = respuesta.content[0].text
-        LOGGER.info("Análisis de seguridad recibido")
-
-        # Mostrar la respuesta
-        LOGGER.info("Respuesta :\n%s", analisis)
-
-        # Verificar si el commit es seguro
-        if not is_commit_safe(analisis):
-            LOGGER.error(
-                "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
-            )
-            
-            # Crear un issue en GitHub solo si se detectan vulnerabilidades
-            issue_url = create_github_issue(analisis, GITHUB_COMMIT_SHA, github_client)
-            if issue_url:
-                LOGGER.info("Se ha creado un issue con el análisis: %s", issue_url)
-                LOGGER.error(
-                    "Revisa el issue creado en GitHub para más detalles: %s", issue_url
+        if item_scan.get("source") == "github":
+            # Inicializar el cliente de GitHub
+            github_client = Github(decrypt(item_scan.get("args").get("githubToken")))
+            github_repo_name = item_scan.get("args").get("githubRepoName")
+            github_commit_sha = item_scan.get("args").get("githubCommitSha")
+            github_assignee = item_scan.get("args").get("githubAssignee")
+            # Descargar archivos del repositorio
+            if not github_download_repository_files(
+                github_client, github_repo_name, github_commit_sha
+            ):
+                exit_with_error(
+                    "No se pudieron descargar los archivos del repositorio.",
+                    TITVO_SCAN_TASK_ID,
                 )
+            # Obtener el contenido de los archivos
+            contenido_archivos = github_get_files_content()
+            user_prompt = f"""
+            A continuación te proporciono el código fuente de un commit específico 
+            del repositorio {github_repo_name} (commit: {github_commit_sha}).
             
-            # Actualizar el estado a FAILED
-            update_scan_status(TITVO_SCAN_TASK_ID, "FAILED", issue_url)
+            El formato de presentación es el siguiente:
+            - Cada archivo se presenta con su nombre en formato **Archivo: ruta/al/archivo**
+            - Seguido por el contenido del archivo dentro de un bloque de código markdown
             
-            # No usamos sys.exit(1) aquí para no indicar un error del script
-            # Solo indicamos que el commit tiene vulnerabilidades
-        else:
-            LOGGER.info(
-                "COMMIT APROBADO. No se detectaron vulnerabilidades de seguridad significativas."
+            Analiza el código y proporciona un resumen de las vulnerabilidades encontradas en formato markdown, organizadas por tipo de vulnerabilidad y severidad.
+            
+            Recuerda que debes comenzar tu respuesta con el patrón [COMMIT_RECHAZADO] o [COMMIT_APROBADO] según corresponda.
+            
+            Código fuente a analizar:{contenido_archivos}
+            """
+
+            # Enviar la solicitud a Claude
+            respuesta = client.messages.create(
+                model=MODELO,
+                max_tokens=4000,
+                temperature=0.7,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
             )
-            # Actualizar el estado a COMPLETED sin crear issue
-            update_scan_status(TITVO_SCAN_TASK_ID, "COMPLETED")
+
+            # Obtener el análisis de Claude
+            analisis = respuesta.content[0].text
+            LOGGER.info("Análisis de seguridad recibido")
+
+            # Mostrar la respuesta
+            LOGGER.info("Respuesta :\n%s", analisis)
+
+            # Verificar si el commit es seguro
+            if not is_commit_safe(analisis):
+                LOGGER.error(
+                    "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
+                )
+
+                # Crear un issue en GitHub solo si se detectan vulnerabilidades
+                issue_url = create_github_issue(
+                    analisis,
+                    github_commit_sha,
+                    github_client,
+                    github_repo_name,
+                    github_assignee,
+                )
+                if issue_url:
+                    LOGGER.info("Se ha creado un issue con el análisis: %s", issue_url)
+                    LOGGER.error(
+                        "Revisa el issue creado en GitHub para más detalles: %s",
+                        issue_url,
+                    )
+
+                # Actualizar el estado a FAILED
+                update_scan_status(TITVO_SCAN_TASK_ID, "FAILED", issue_url)
+
+                # No usamos sys.exit(1) aquí para no indicar un error del script
+                # Solo indicamos que el commit tiene vulnerabilidades
+            else:
+                LOGGER.info(
+                    "COMMIT APROBADO. No se detectaron vulnerabilidades "
+                    "de seguridad significativas."
+                )
+                # Actualizar el estado a COMPLETED sin crear issue
+                update_scan_status(TITVO_SCAN_TASK_ID, "COMPLETED")
+        else:
+            LOGGER.info("No se pudo obtener el source del escaneo")
+            exit_with_error(
+                "No se pudo obtener el source del escaneo", TITVO_SCAN_TASK_ID
+            )
 
     except Exception as e:
         LOGGER.exception(e)
-        exit_with_error(
-            f"Error durante el análisis: {str(e)}", 
-            TITVO_SCAN_TASK_ID
-        )
+        exit_with_error(f"Error durante el análisis: {str(e)}", TITVO_SCAN_TASK_ID)
 
 
 if __name__ == "__main__":
