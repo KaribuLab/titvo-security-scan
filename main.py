@@ -53,7 +53,7 @@ def get_ssm_parameter(parameter_name):
         # Obtener el parámetro
         response = ssm.get_parameter(
             Name=parameter_name,
-            WithDecryption=False,
+            WithDecryption=True,
         )
 
         # Extraer el valor del parámetro
