@@ -303,50 +303,46 @@ def get_scan_item(scan_id):
 
 def update_scan_status(scan_id, status, result=None):
     """Actualiza el estado del escaneo en DynamoDB y opcionalmente el resultado."""
-    try:
-        # Obtener el nombre de la tabla
-        nombre_tabla = get_table_name()
-        if not nombre_tabla:
-            LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
-            return False
-
-        # Inicializar el cliente de DynamoDB
-        dynamodb = boto3.resource("dynamodb")
-        tabla = dynamodb.Table(nombre_tabla)
-
-        fecha_actual = datetime.now(pytz.utc).isoformat()
-
-        # Preparar la expresión de actualización y los valores
-        update_expression = "set #status = :s, updated_at = :u"
-        expression_attribute_names = {"#status": "status"}
-        expression_attribute_values = {":s": status, ":u": fecha_actual}
-
-        # Si se proporciona el resultado, incluirlo en la actualización
-        if result is not None:
-            update_expression += ", scan_result = :r"
-            expression_attribute_values[":r"] = result
-            LOGGER.info("Se incluirá el resultado en la actualización: %s", result)
-
-        # Actualizar el item
-        tabla.update_item(
-            Key={"scan_id": scan_id},
-            UpdateExpression=update_expression,
-            ExpressionAttributeNames=expression_attribute_names,
-            ExpressionAttributeValues=expression_attribute_values,
-            ReturnValues="UPDATED_NEW",
-        )
-
-        log_message = (
-            f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
-        )
-        if result is not None:
-            log_message += f", result: {result}"
-        LOGGER.info(log_message)
-
-        return True
-    except ClientError as e:
-        LOGGER.error("Error al actualizar el estado en DynamoDB: %s", e)
+    # Obtener el nombre de la tabla
+    nombre_tabla = get_table_name()
+    if not nombre_tabla:
+        LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
         return False
+
+    # Inicializar el cliente de DynamoDB
+    dynamodb = boto3.resource("dynamodb")
+    tabla = dynamodb.Table(nombre_tabla)
+
+    fecha_actual = datetime.now(pytz.utc).isoformat()
+
+    # Preparar la expresión de actualización y los valores
+    update_expression = "set #status = :s, updated_at = :u"
+    expression_attribute_names = {"#status": "status"}
+    expression_attribute_values = {":s": status, ":u": fecha_actual}
+
+    # Si se proporciona el resultado, incluirlo en la actualización
+    if result is not None:
+        update_expression += ", scan_result = :r"
+        expression_attribute_values[":r"] = result
+        LOGGER.info("Se incluirá el resultado en la actualización: %s", result)
+
+    # Actualizar el item
+    tabla.update_item(
+        Key={"scan_id": scan_id},
+        UpdateExpression=update_expression,
+        ExpressionAttributeNames=expression_attribute_names,
+        ExpressionAttributeValues=expression_attribute_values,
+        ReturnValues="UPDATED_NEW",
+    )
+
+    log_message = (
+        f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
+    )
+    if result is not None:
+        log_message += f", result: {result}"
+    LOGGER.info(log_message)
+
+    return True
 
 
 def exit_with_error(message, scan_id=None):
