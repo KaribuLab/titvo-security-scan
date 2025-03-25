@@ -417,7 +417,7 @@ def main():
     try:
         if item_scan.get("source") == "github":
             # Inicializar el cliente de GitHub
-            github_client = Github(decrypt(item_scan.get("args").get("githubToken")))
+            github_client = Github(decrypt(item_scan.get("args").get("github_token")))
             github_repo_name = item_scan.get("args").get("github_repo_name")
             github_commit_sha = item_scan.get("args").get("github_commit_sha")
             github_assignee = item_scan.get("args").get("github_assignee")
