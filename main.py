@@ -301,8 +301,8 @@ def get_scan_item(scan_id):
         return None
 
 
-def update_scan_status(scan_id, status, issue_url=None):
-    """Actualiza el estado del escaneo en DynamoDB y opcionalmente la URL del issue."""
+def update_scan_status(scan_id, status, result=None):
+    """Actualiza el estado del escaneo en DynamoDB y opcionalmente el resultado."""
     try:
         # Obtener el nombre de la tabla
         nombre_tabla = get_table_name()
@@ -313,20 +313,23 @@ def update_scan_status(scan_id, status, issue_url=None):
         # Inicializar el cliente de DynamoDB
         dynamodb = boto3.resource("dynamodb")
         tabla = dynamodb.Table(nombre_tabla)
-
+        
         fecha_actual = datetime.now(pytz.utc).isoformat()
-
+        
         # Preparar la expresión de actualización y los valores
         update_expression = "set #status = :s, updated_at = :u"
         expression_attribute_names = {"#status": "status"}
-        expression_attribute_values = {":s": status, ":u": fecha_actual}
-
-        # Si se proporciona la URL del issue, incluirla en la actualización
-        if issue_url:
-            update_expression += ", issue_url = :i"
-            expression_attribute_values[":i"] = issue_url
+        expression_attribute_values = {
+            ":s": status,
+            ":u": fecha_actual
+        }
+        
+        # Si se proporciona el resultado, incluirlo en la actualización
+        if result is not None:
+            update_expression += ", result = :r"
+            expression_attribute_values[":r"] = result
             LOGGER.info(
-                "Se incluirá la URL del issue en la actualización: %s", issue_url
+                "Se incluirá el resultado en la actualización: %s", result
             )
 
         # Actualizar el item
@@ -338,13 +341,11 @@ def update_scan_status(scan_id, status, issue_url=None):
             ReturnValues="UPDATED_NEW",
         )
 
-        log_message = (
-            f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
-        )
-        if issue_url:
-            log_message += f", issue_url: {issue_url}"
+        log_message = f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
+        if result is not None:
+            log_message += f", result: {result}"
         LOGGER.info(log_message)
-
+        
         return True
     except ClientError as e:
         LOGGER.error("Error al actualizar el estado en DynamoDB: %s", e)
@@ -486,7 +487,9 @@ def main():
                     )
 
                 # Actualizar el estado a FAILED
-                update_scan_status(TITVO_SCAN_TASK_ID, "FAILED", issue_url)
+                update_scan_status(TITVO_SCAN_TASK_ID, "FAILED", {
+                    "issue_url": issue_url,
+                })
 
                 # No usamos sys.exit(1) aquí para no indicar un error del script
                 # Solo indicamos que el commit tiene vulnerabilidades
