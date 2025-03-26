@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import base64
 from base64 import b64decode
 import logging
@@ -12,6 +13,7 @@ from github import Github
 import pytz
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
+import requests
 
 # Configurar el logger
 logging.basicConfig(
@@ -28,7 +30,9 @@ load_dotenv()
 TITVO_SCAN_TASK_ID = os.getenv("TITVO_SCAN_TASK_ID")  # ID del trabajo de escaneo
 
 # Modelo a utilizar
-MODELO = "claude-3-7-sonnet-latest"
+MODEL = "claude-3-7-sonnet-latest"
+ACCESS_TOKEN_URL = "https://bitbucket.org/site/oauth2/access_token"
+BITBUCKET_API_URL = "https://api.bitbucket.org/2.0"
 
 # Inicializar el cliente de SSM
 ssm = boto3.client("ssm")
@@ -161,7 +165,165 @@ def github_download_repository_files(
         return False
 
 
-def github_get_files_content():
+def get_bitbucket_access_token():
+    client_credentials = get_secret_manager_parameter(
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/bitbucket_client_credentials"
+    )
+    if client_credentials is not None or client_credentials != "":
+        credentials = json.loads(client_credentials)
+        client_id = credentials.get("key")
+        client_secret = credentials.get("secret")
+        response = requests.post(
+            ACCESS_TOKEN_URL,
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "client_credentials",
+            },
+            timeout=30,
+        )
+        if response.status_code == 200:
+            return response.json().get("access_token")
+        else:
+            LOGGER.error("Error al obtener el token de Bitbucket: %s", response.json())
+            return None
+    return None
+
+
+def bitbucket_download_file(headers, workspace, repo, file_path, commit):
+    """Descarga un archivo específico del commit."""
+    content_url = (
+        f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/src/{commit}/{file_path}"
+    )
+    response = requests.get(content_url, headers=headers, timeout=30)
+
+    if response.status_code == 200:
+        # Crear directorios si no existen
+        full_path = os.path.join("repo_files", file_path)
+        dirname = os.path.dirname(full_path)
+        if dirname != "":
+            os.makedirs(dirname, exist_ok=True)
+
+        # Guardar el contenido directamente
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(response.text)
+        LOGGER.info("✓ Descargado: %s", full_path)
+        return True
+    return False
+
+
+def bitbucket_download_repository_files(
+    bitbucket_workspace: str,
+    bitbucket_repo_slug: str,
+    bitbucket_commit_sha: str,
+):
+    """Descarga los archivos del repositorio de Bitbucket en el commit especificado.
+
+    Args:
+        bitbucket_workspace (str): El workspace de Bitbucket
+        bitbucket_repo_slug (str): El slug del repositorio
+        bitbucket_project_key (str): La clave del proyecto
+        bitbucket_commit_sha (str): El SHA del commit
+
+    Returns:
+        bool: True si la descarga fue exitosa, False en caso contrario
+    """
+    access_token = get_bitbucket_access_token()
+    if access_token is None:
+        LOGGER.error("No se pudo obtener el token de Bitbucket")
+        return False
+
+    try:
+        LOGGER.info(
+            "Accediendo al repositorio de Bitbucket: %s/%s",
+            bitbucket_workspace,
+            bitbucket_repo_slug,
+        )
+        LOGGER.info("Commit: %s", bitbucket_commit_sha)
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        }
+
+        # Obtener información del commit específico usando la API REST
+        commit_url = (
+            f"{BITBUCKET_API_URL}/repositories/{bitbucket_workspace}/"
+            f"{bitbucket_repo_slug}/commit/{bitbucket_commit_sha}"
+        )
+        commit_response = requests.get(commit_url, headers=headers, timeout=30)
+
+        if commit_response.status_code == 200:
+            commit_info = commit_response.json()
+            LOGGER.info("Información del commit %s:", bitbucket_commit_sha)
+            LOGGER.info("Hash: %s", commit_info["hash"])
+            LOGGER.info("Fecha: %s", commit_info["date"])
+            LOGGER.info("Mensaje: %s", commit_info["message"])
+            LOGGER.info("Autor: %s", commit_info["author"]["raw"])
+
+            # Obtener la lista de archivos modificados
+            diff_url = (
+                f"{BITBUCKET_API_URL}/repositories/{bitbucket_workspace}/"
+                f"{bitbucket_repo_slug}/diff/{bitbucket_commit_sha}"
+            )
+            diff_response = requests.get(diff_url, headers=headers, timeout=30)
+
+            if diff_response.status_code == 200:
+                diff_content = diff_response.text
+                # Extraer los nombres de archivos del diff
+                files = set()
+                for line in diff_content.split("\n"):
+                    if line.startswith("diff --git"):
+                        # El formato es: diff --git a/path/to/file b/path/to/file
+                        file_path = line.split(" b/")[1]
+                        files.add(file_path)
+
+                LOGGER.info("\nArchivos modificados:")
+                for file in sorted(files):
+                    LOGGER.info("- %s", file)
+
+                LOGGER.info("\nDescargando archivos...")
+                successful_downloads = 0
+                for file in sorted(files):
+                    if bitbucket_download_file(
+                        headers,
+                        bitbucket_workspace,
+                        bitbucket_repo_slug,
+                        file,
+                        bitbucket_commit_sha,
+                    ):
+                        successful_downloads += 1
+
+                LOGGER.info(
+                    "Resumen de descargas: %s/%s archivos descargados exitosamente",
+                    successful_downloads,
+                    len(files),
+                )
+            else:
+                LOGGER.error(
+                    "Error al obtener los archivos modificados: %s - %s",
+                    diff_response.status_code,
+                    diff_response.text,
+                )
+        else:
+            LOGGER.error(
+                "No se encontró el commit con hash %s",
+                bitbucket_commit_sha,
+            )
+            LOGGER.error(
+                "Error: %s - %s",
+                commit_response.status_code,
+                commit_response.text,
+            )
+
+        return True
+
+    except Exception as e:
+        LOGGER.error("Error al acceder al repositorio de Bitbucket: %s", e)
+        return False
+
+
+def get_files_content():
     """Obtiene el contenido de todos los archivos descargados."""
     contenido_archivos = ""
     LOGGER.info("Obteniendo contenido de los archivos descargados")
@@ -197,6 +359,99 @@ def github_get_files_content():
                 )
 
     return contenido_archivos
+
+
+def generate_security_analysis_prompt(repo_info: dict, contenido_archivos: str) -> str:
+    """Genera el prompt para el análisis de seguridad.
+
+    Args:
+        repo_info (dict): Diccionario con la información del repositorio
+        contenido_archivos (str): Contenido de los archivos a analizar
+
+    Returns:
+        str: El prompt generado
+    """
+    repo_identifier = ""
+    if repo_info.get("source") == "github":
+        repo_identifier = repo_info.get("repo_name")
+    elif repo_info.get("source") == "bitbucket":
+        repo_identifier = f"{repo_info.get('workspace')}/{repo_info.get('repo_slug')}"
+
+    return f"""
+    A continuación te proporciono el código fuente de un commit específico 
+    del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
+    
+    El formato de presentación es el siguiente:
+    - Cada archivo se presenta con su nombre en formato **Archivo: ruta/al/archivo**
+    - Seguido por el contenido del archivo dentro de un bloque de código markdown
+    
+    Analiza el código y proporciona un resumen de las vulnerabilidades encontradas en formato markdown, organizadas por tipo de vulnerabilidad y severidad.
+    
+    Recuerda que debes comenzar tu respuesta con el patrón [COMMIT_RECHAZADO] o [COMMIT_APROBADO] según corresponda.
+    
+    Código fuente a analizar:{contenido_archivos}
+    """
+
+
+def analyze_code(
+    client, system_prompt: str, user_prompt: str, scan_id: str
+) -> tuple[bool, str]:
+    """Realiza el análisis de seguridad del código.
+
+    Args:
+        client: Cliente de Claude
+        system_prompt (str): Prompt del sistema
+        user_prompt (str): Prompt del usuario
+        scan_id (str): ID del escaneo
+
+    Returns:
+        tuple[bool, str]: Una tupla con (True si el commit es seguro, el análisis de seguridad)
+    """
+    try:
+        # Enviar la solicitud a Claude
+        respuesta = client.messages.create(
+            model=MODEL,
+            max_tokens=4000,
+            temperature=0.7,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        # Obtener el análisis de Claude
+        analysis = respuesta.content[0].text
+        LOGGER.info("Análisis de seguridad recibido")
+
+        # Mostrar la respuesta
+        LOGGER.info("Respuesta :\n%s", analysis)
+
+        # Verificar si el commit es seguro
+        if not is_commit_safe(analysis):
+            LOGGER.error(
+                "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
+            )
+
+            # Actualizar el estado a FAILED
+            update_scan_status(
+                scan_id,
+                "FAILED",
+                {
+                    "analysis": analysis,
+                },
+            )
+            return False, analysis
+        else:
+            LOGGER.info(
+                "COMMIT APROBADO. No se detectaron vulnerabilidades "
+                "de seguridad significativas."
+            )
+            # Actualizar el estado a COMPLETED
+            update_scan_status(scan_id, "COMPLETED")
+            return True, analysis
+
+    except Exception as e:
+        LOGGER.exception(e)
+        exit_with_error(f"Error durante el análisis: {str(e)}", scan_id)
+        return False, ""
 
 
 def create_github_issue(
@@ -335,9 +590,7 @@ def update_scan_status(scan_id, status, result=None):
         ReturnValues="UPDATED_NEW",
     )
 
-    log_message = (
-        f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
-    )
+    log_message = f"Estado del escaneo actualizado a: {status}, fecha: {fecha_actual}"
     if result is not None:
         log_message += f", result: {result}"
     LOGGER.info(log_message)
@@ -364,9 +617,7 @@ def decrypt(data):
             return None
         key = b64decode(secret)
         cipher = AES.new(key, AES.MODE_ECB)
-        decrypted_data = unpad(
-            cipher.decrypt(b64decode(data)), AES.block_size
-        )
+        decrypted_data = unpad(cipher.decrypt(b64decode(data)), AES.block_size)
         return decrypted_data.decode("utf-8")
     except ClientError as e:
         LOGGER.exception(e)
@@ -416,14 +667,14 @@ def main():
         if item_scan.get("source") == "github":
             # Inicializar el cliente de GitHub
             github_client = Github(decrypt(item_scan.get("args").get("github_token")))
-            github_repo_name = item_scan.get("args").get("github_repo_name").replace(
-                '"', ""
+            github_repo_name = (
+                item_scan.get("args").get("github_repo_name").replace('"', "")
             )
-            github_commit_sha = item_scan.get("args").get("github_commit_sha").replace(
-                '"', ""
+            github_commit_sha = (
+                item_scan.get("args").get("github_commit_sha").replace('"', "")
             )
-            github_assignee = item_scan.get("args").get("github_assignee").replace(
-                '"', ""
+            github_assignee = (
+                item_scan.get("args").get("github_assignee").replace('"', "")
             )
             # Descargar archivos del repositorio
             if not github_download_repository_files(
@@ -434,47 +685,30 @@ def main():
                     TITVO_SCAN_TASK_ID,
                 )
             # Obtener el contenido de los archivos
-            contenido_archivos = github_get_files_content()
-            user_prompt = f"""
-            A continuación te proporciono el código fuente de un commit específico 
-            del repositorio {github_repo_name} (commit: {github_commit_sha}).
-            
-            El formato de presentación es el siguiente:
-            - Cada archivo se presenta con su nombre en formato **Archivo: ruta/al/archivo**
-            - Seguido por el contenido del archivo dentro de un bloque de código markdown
-            
-            Analiza el código y proporciona un resumen de las vulnerabilidades encontradas en formato markdown, organizadas por tipo de vulnerabilidad y severidad.
-            
-            Recuerda que debes comenzar tu respuesta con el patrón [COMMIT_RECHAZADO] o [COMMIT_APROBADO] según corresponda.
-            
-            Código fuente a analizar:{contenido_archivos}
-            """
+            contenido_archivos = get_files_content()
 
-            # Enviar la solicitud a Claude
-            respuesta = client.messages.create(
-                model=MODELO,
-                max_tokens=4000,
-                temperature=0.7,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
+            # Preparar información del repositorio
+            repo_info = {
+                "source": "github",
+                "repo_name": github_repo_name,
+                "commit_sha": github_commit_sha,
+                "assignee": github_assignee,
+                "client": github_client,
+            }
+
+            # Generar el prompt
+            user_prompt = generate_security_analysis_prompt(
+                repo_info, contenido_archivos
             )
 
-            # Obtener el análisis de Claude
-            analisis = respuesta.content[0].text
-            LOGGER.info("Análisis de seguridad recibido")
-
-            # Mostrar la respuesta
-            LOGGER.info("Respuesta :\n%s", analisis)
-
-            # Verificar si el commit es seguro
-            if not is_commit_safe(analisis):
-                LOGGER.error(
-                    "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
-                )
-
+            # Realizar el análisis
+            is_safe, analysis = analyze_code(
+                client, system_prompt, user_prompt, TITVO_SCAN_TASK_ID
+            )
+            if not is_safe:
                 # Crear un issue en GitHub solo si se detectan vulnerabilidades
                 issue_url = create_github_issue(
-                    analisis,
+                    analysis,
                     github_commit_sha,
                     github_client,
                     github_repo_name,
@@ -486,25 +720,68 @@ def main():
                         "Revisa el issue creado en GitHub para más detalles: %s",
                         issue_url,
                     )
+                    # Actualizar el estado con la URL del issue
+                    update_scan_status(
+                        TITVO_SCAN_TASK_ID,
+                        "FAILED",
+                        {
+                            "issue_url": issue_url,
+                        },
+                    )
 
-                # Actualizar el estado a FAILED
-                update_scan_status(
+        elif item_scan.get("source") == "bitbucket":
+            # Obtener parámetros de Bitbucket
+            bitbucket_workspace = (
+                item_scan.get("args").get("bitbucket_workspace").replace('"', "")
+            )
+            bitbucket_repo_slug = (
+                item_scan.get("args").get("bitbucket_repo_slug").replace('"', "")
+            )
+            bitbucket_project_key = (
+                item_scan.get("args").get("bitbucket_project_key").replace('"', "")
+            )
+            bitbucket_commit_sha = (
+                item_scan.get("args").get("bitbucket_commit_sha").replace('"', "")
+            )
+
+            # Descargar archivos del repositorio
+            if not bitbucket_download_repository_files(
+                bitbucket_workspace,
+                bitbucket_repo_slug,
+                bitbucket_commit_sha,
+            ):
+                exit_with_error(
+                    "No se pudieron descargar los archivos del repositorio de Bitbucket.",
                     TITVO_SCAN_TASK_ID,
-                    "FAILED",
-                    {
-                        "issue_url": issue_url,
-                    },
                 )
 
-                # No usamos sys.exit(1) aquí para no indicar un error del script
-                # Solo indicamos que el commit tiene vulnerabilidades
-            else:
-                LOGGER.info(
-                    "COMMIT APROBADO. No se detectaron vulnerabilidades "
-                    "de seguridad significativas."
+            # Obtener el contenido de los archivos
+            contenido_archivos = get_files_content()
+
+            # Preparar información del repositorio
+            repo_info = {
+                "source": "bitbucket",
+                "workspace": bitbucket_workspace,
+                "repo_slug": bitbucket_repo_slug,
+                "project_key": bitbucket_project_key,
+                "commit_sha": bitbucket_commit_sha,
+            }
+
+            # Generar el prompt
+            user_prompt = generate_security_analysis_prompt(
+                repo_info, contenido_archivos
+            )
+
+            # Realizar el análisis
+            is_safe, analysis = analyze_code(
+                client, system_prompt, user_prompt, TITVO_SCAN_TASK_ID
+            )
+            if not is_safe:
+                exit_with_error(
+                    "No se pudo realizar el análisis de seguridad",
+                    TITVO_SCAN_TASK_ID,
                 )
-                # Actualizar el estado a COMPLETED sin crear issue
-                update_scan_status(TITVO_SCAN_TASK_ID, "COMPLETED")
+
         else:
             LOGGER.info("No se pudo obtener el source del escaneo")
             exit_with_error(
