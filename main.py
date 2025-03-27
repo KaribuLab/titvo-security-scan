@@ -607,6 +607,7 @@ def create_bitbucket_code_insights_report(
         Body=html_analysis,
     )
     report_url = f"{bucket_domain}/{analysis_key}"
+    LOGGER.info("Reporte creado en S3: %s", report_url)
     payload = {
         "title": "Titvo Security Scan",
         "details": "Security scan report",
@@ -619,7 +620,11 @@ def create_bitbucket_code_insights_report(
                 "type": "BOOLEAN",
                 "value": is_safe,
             },
-            {"title": "Details", "type": "LINK", "value": report_url},
+            {
+                "title": "Report",
+                "type": "LINK",
+                "value": {"text": "See full report", "href": report_url},
+            },
         ],
     }
     response = requests.put(
