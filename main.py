@@ -429,15 +429,6 @@ def analyze_code(
             LOGGER.error(
                 "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
             )
-
-            # Actualizar el estado a FAILED
-            update_scan_status(
-                scan_id,
-                "FAILED",
-                {
-                    "analysis": analysis,
-                },
-            )
             return False, analysis
         else:
             LOGGER.info(
@@ -728,6 +719,12 @@ def main():
                             "issue_url": issue_url,
                         },
                     )
+            else:
+                update_scan_status(
+                    TITVO_SCAN_TASK_ID,
+                    "SUCCESS",
+                    {},
+                )
 
         elif item_scan.get("source") == "bitbucket":
             # Obtener parámetros de Bitbucket
@@ -777,9 +774,17 @@ def main():
                 client, system_prompt, user_prompt, TITVO_SCAN_TASK_ID
             )
             if not is_safe:
-                exit_with_error(
-                    "No se pudo realizar el análisis de seguridad",
+                # Actualizar el estado a FAILED
+                update_scan_status(
                     TITVO_SCAN_TASK_ID,
+                    "FAILED",
+                    {},
+                )
+            else:
+                update_scan_status(
+                    TITVO_SCAN_TASK_ID,
+                    "SUCCESS",
+                    {},
                 )
 
         else:
