@@ -605,6 +605,7 @@ def create_bitbucket_code_insights_report(
         Bucket=report_bucket,
         Key=analysis_key,
         Body=html_analysis,
+        ContentType="text/html",
     )
     report_url = f"{bucket_domain}/{analysis_key}"
     LOGGER.info("Reporte creado en S3: %s", report_url)
