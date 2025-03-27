@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import uuid
 import base64
 from base64 import b64decode
 import logging
@@ -14,6 +15,7 @@ import pytz
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 import requests
+import markdown
 
 # Configurar el logger
 logging.basicConfig(
@@ -37,6 +39,7 @@ BITBUCKET_API_URL = "https://api.bitbucket.org/2.0"
 # Inicializar el cliente de SSM
 ssm = boto3.client("ssm")
 secret_manager = boto3.client("secretsmanager")
+s3 = boto3.client("s3")
 
 
 def get_secret_manager_parameter(secret_name):
@@ -213,6 +216,7 @@ def bitbucket_download_file(headers, workspace, repo, file_path, commit):
 
 
 def bitbucket_download_repository_files(
+    access_token: str,
     bitbucket_workspace: str,
     bitbucket_repo_slug: str,
     bitbucket_commit: str,
@@ -228,7 +232,6 @@ def bitbucket_download_repository_files(
     Returns:
         bool: True si la descarga fue exitosa, False en caso contrario
     """
-    access_token = get_bitbucket_access_token()
     if access_token is None:
         LOGGER.error("No se pudo obtener el token de Bitbucket")
         return False
@@ -494,6 +497,63 @@ def create_github_issue(
         return None
 
 
+def create_bitbucket_code_insights_report(
+    access_token, workspace, repo, commit, is_safe, analysis
+) -> str:
+    """Crea un reporte de código en Bitbucket."""
+    url = (
+        f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
+        f"titvo-security-scan-{uuid.uuid4()}"
+    )
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    report_bucket = get_ssm_parameter(
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/report-bucket-name"
+    )
+    bucket_domain = get_ssm_parameter(
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/report-bucket-domain"
+    )
+    html_analysis = markdown.markdown(analysis, extensions=["md_in_html"])
+    analysis_key = f"scm/bitbucket/scan/{TITVO_SCAN_TASK_ID}.html"
+    s3.put_object(
+        Bucket=report_bucket,
+        Key=analysis_key,
+        Body=html_analysis,
+    )
+    report_url = f"{bucket_domain}/{analysis_key}"
+    payload = {
+        "title": "Titvo Security Scan",
+        "details": "Security scan report",
+        "report_type": "SECURITY",
+        "reporter": "titvo-security-scan",
+        "result": "FAILED" if not is_safe else "SUCCESS",
+        "data": [
+            {"title": "Duration in seconds", "type": "DURATION", "value": 14},
+            {
+                "title": "Safe to merge?",
+                "type": "BOOLEAN",
+                "value": is_safe,
+            },
+            {
+                "title": "Analysis",
+                "type": "STRING",
+                "value": analysis,
+            },
+            {"title": "Details", "type": "LINK", "value": report_url},
+        ],
+    }
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    if response.status_code == 200:
+        return report_url
+    else:
+        LOGGER.error(
+            "Error al crear el reporte de código en Bitbucket: %s", response.json()
+        )
+        return None
+
+
 def is_commit_safe(analysis):
     """Determina si el commit es seguro basado en el análisis de Claude."""
     # Buscar el patrón específico que indica rechazo
@@ -741,8 +801,16 @@ def main():
                 item_scan.get("args").get("bitbucket_commit").replace('"', "")
             )
 
+            access_token = get_bitbucket_access_token()
+            if not access_token:
+                exit_with_error(
+                    "No se pudo obtener el token de Bitbucket",
+                    TITVO_SCAN_TASK_ID,
+                )
+
             # Descargar archivos del repositorio
             if not bitbucket_download_repository_files(
+                access_token,
                 bitbucket_workspace,
                 bitbucket_repo_slug,
                 bitbucket_commit,
@@ -774,12 +842,35 @@ def main():
                 client, system_prompt, user_prompt, TITVO_SCAN_TASK_ID
             )
             if not is_safe:
-                # Actualizar el estado a FAILED
-                update_scan_status(
-                    TITVO_SCAN_TASK_ID,
-                    "FAILED",
-                    {},
+                report_url = create_bitbucket_code_insights_report(
+                    access_token,
+                    bitbucket_workspace,
+                    bitbucket_repo_slug,
+                    bitbucket_commit,
+                    is_safe,
+                    analysis,
                 )
+                if report_url is not None:
+                    LOGGER.info(
+                        "Se ha creado un reporte de código en Bitbucket: %s", report_url
+                    )
+                    LOGGER.error(
+                        "Revisa el reporte de código en Bitbucket para más detalles: %s",
+                        report_url,
+                    )
+                    # Actualizar el estado a FAILED
+                    update_scan_status(
+                        TITVO_SCAN_TASK_ID,
+                        "FAILED",
+                        {
+                            "report_url": report_url,
+                        },
+                    )
+                else:
+                    exit_with_error(
+                        "No se pudo crear el reporte de código en Bitbucket",
+                        TITVO_SCAN_TASK_ID,
+                    )
             else:
                 update_scan_status(
                     TITVO_SCAN_TASK_ID,

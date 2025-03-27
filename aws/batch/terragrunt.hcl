@@ -30,7 +30,8 @@ dependency parameters {
       "/tvo/security-scan/prod/infra/vpc-id"                = "vpc-000000000000000"
       "/tvo/security-scan/prod/infra/subnet1"               = "subnet-0c4b3b6b1b7b3b3b3"
       "/tvo/security-scan/prod/infra/dynamo-task-table-arn" = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-task-table-prod"
-      "/tvo/security-scan/prod/infra/secret-manager-arn"    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:/tvo/security-scan/prod"
+      "/tvo/security-scan/prod/infra/secret-manager-arn"    = "arn:aws:secretsmanager:us-east-1:000000000000:secret:/tvo/security-scan/prod",
+      "/tvo/security-scan/prod/infra/report-bucket-arn"     = "arn:aws:s3:::devsecops-titvo-com-report-bucket"
     }
   }
 }
@@ -83,6 +84,15 @@ inputs = {
         ],
         "Resource" : [
           "arn:aws:secretsmanager:*:*:secret:/tvo/security-scan/prod*"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "s3:PutObject"
+        ],
+        "Resource" : [
+          dependency.parameters.outputs.parameters["${local.base_path}/infra/report-bucket-arn"]
         ]
       }
     ]
