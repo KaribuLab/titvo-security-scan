@@ -510,10 +510,10 @@ def create_bitbucket_code_insights_report(
         "Content-Type": "application/json",
     }
     report_bucket = get_ssm_parameter(
-        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/report-bucket-name"
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/github-security-scan/report-bucket-name"
     )
     bucket_domain = get_ssm_parameter(
-        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/report-bucket-domain"
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/github-security-scan/report-bucket-domain"
     )
     html_analysis = markdown.markdown(analysis, extensions=["md_in_html"])
     analysis_key = f"scm/bitbucket/scan/{TITVO_SCAN_TASK_ID}.html"
