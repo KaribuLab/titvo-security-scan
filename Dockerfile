@@ -14,7 +14,6 @@ RUN chown -R titvo:titvo /app
 
 # Instalar dependencias
 RUN pip install -r requirements.txt
-RUN pip install markdown
 
 # Cambiar al usuario no privilegiado
 USER titvo
