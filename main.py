@@ -406,6 +406,7 @@ def analyze_code(
         respuesta = client.messages.create(
             model=MODEL,
             temperature=0.7,
+            max_tokens=4000,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
