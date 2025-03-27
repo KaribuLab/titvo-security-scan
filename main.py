@@ -604,7 +604,7 @@ def create_bitbucket_code_insights_report(
             {
                 "title": "Number of issues",
                 "type": "NUMBER",
-                "value": len(json_analysis.get("number_of_issues", 0)),
+                "value": json_analysis.get("number_of_issues", 0),
             },
             {
                 "title": "Report",
