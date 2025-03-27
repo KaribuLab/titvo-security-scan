@@ -215,7 +215,7 @@ def bitbucket_download_file(headers, workspace, repo, file_path, commit):
 def bitbucket_download_repository_files(
     bitbucket_workspace: str,
     bitbucket_repo_slug: str,
-    bitbucket_commit_sha: str,
+    bitbucket_commit: str,
 ):
     """Descarga los archivos del repositorio de Bitbucket en el commit especificado.
 
@@ -223,7 +223,7 @@ def bitbucket_download_repository_files(
         bitbucket_workspace (str): El workspace de Bitbucket
         bitbucket_repo_slug (str): El slug del repositorio
         bitbucket_project_key (str): La clave del proyecto
-        bitbucket_commit_sha (str): El SHA del commit
+        bitbucket_commit (str): El SHA del commit
 
     Returns:
         bool: True si la descarga fue exitosa, False en caso contrario
@@ -239,7 +239,7 @@ def bitbucket_download_repository_files(
             bitbucket_workspace,
             bitbucket_repo_slug,
         )
-        LOGGER.info("Commit: %s", bitbucket_commit_sha)
+        LOGGER.info("Commit: %s", bitbucket_commit)
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -249,13 +249,13 @@ def bitbucket_download_repository_files(
         # Obtener información del commit específico usando la API REST
         commit_url = (
             f"{BITBUCKET_API_URL}/repositories/{bitbucket_workspace}/"
-            f"{bitbucket_repo_slug}/commit/{bitbucket_commit_sha}"
+            f"{bitbucket_repo_slug}/commit/{bitbucket_commit}"
         )
         commit_response = requests.get(commit_url, headers=headers, timeout=30)
 
         if commit_response.status_code == 200:
             commit_info = commit_response.json()
-            LOGGER.info("Información del commit %s:", bitbucket_commit_sha)
+            LOGGER.info("Información del commit %s:", bitbucket_commit)
             LOGGER.info("Hash: %s", commit_info["hash"])
             LOGGER.info("Fecha: %s", commit_info["date"])
             LOGGER.info("Mensaje: %s", commit_info["message"])
@@ -264,7 +264,7 @@ def bitbucket_download_repository_files(
             # Obtener la lista de archivos modificados
             diff_url = (
                 f"{BITBUCKET_API_URL}/repositories/{bitbucket_workspace}/"
-                f"{bitbucket_repo_slug}/diff/{bitbucket_commit_sha}"
+                f"{bitbucket_repo_slug}/diff/{bitbucket_commit}"
             )
             diff_response = requests.get(diff_url, headers=headers, timeout=30)
 
@@ -290,7 +290,7 @@ def bitbucket_download_repository_files(
                         bitbucket_workspace,
                         bitbucket_repo_slug,
                         file,
-                        bitbucket_commit_sha,
+                        bitbucket_commit,
                     ):
                         successful_downloads += 1
 
@@ -308,7 +308,7 @@ def bitbucket_download_repository_files(
         else:
             LOGGER.error(
                 "No se encontró el commit con hash %s",
-                bitbucket_commit_sha,
+                bitbucket_commit,
             )
             LOGGER.error(
                 "Error: %s - %s",
@@ -740,15 +740,15 @@ def main():
             bitbucket_project_key = (
                 item_scan.get("args").get("bitbucket_project_key").replace('"', "")
             )
-            bitbucket_commit_sha = (
-                item_scan.get("args").get("bitbucket_commit_sha").replace('"', "")
+            bitbucket_commit = (
+                item_scan.get("args").get("bitbucket_commit").replace('"', "")
             )
 
             # Descargar archivos del repositorio
             if not bitbucket_download_repository_files(
                 bitbucket_workspace,
                 bitbucket_repo_slug,
-                bitbucket_commit_sha,
+                bitbucket_commit,
             ):
                 exit_with_error(
                     "No se pudieron descargar los archivos del repositorio de Bitbucket.",
@@ -764,7 +764,7 @@ def main():
                 "workspace": bitbucket_workspace,
                 "repo_slug": bitbucket_repo_slug,
                 "project_key": bitbucket_project_key,
-                "commit_sha": bitbucket_commit_sha,
+                "commit_sha": bitbucket_commit,
             }
 
             # Generar el prompt
