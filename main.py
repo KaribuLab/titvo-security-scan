@@ -453,14 +453,14 @@ def create_github_issue(
         commit = repo.get_commit(commit_sha)
 
         # Crear el título del issue
-        title = f"[BUG] Security vulnerability in commit {commit_sha[:7]}"
+        title = f"[BUG] Problema de seguridad en el commit {commit_sha[:7]}"
 
         # Crear el cuerpo del issue
         body = (
-            f"# 🐛 Security Bug Detected\n\n"
+            f"# 🐛 Problema de seguridad detectado\n\n"
             f"**Commit:** {commit_sha}\n"
-            f"**Author:** {commit.commit.author.name}\n\n"
-            f"## Analysis Results\n\n{analysis}"
+            f"**Autor:** {commit.commit.author.name}\n\n"
+            f"## Resultados del análisis\n\n{analysis}"
         )
 
         # Crear el issue con etiquetas de seguridad

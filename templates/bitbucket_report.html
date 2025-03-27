@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>TiTVO Security Scan Report</title>
+    <title>Reporte de Análisis de Seguridad Titvo</title>
     <link rel="icon" type="image/png" href="https://www.titvo.com/favicon.ico">
     <style>
         :root {
@@ -130,40 +130,50 @@
 <body>
     <div class="header">
         <h1>
-            <img src="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048081cbb0b106db5539f7e_Titvologo.png" alt="TiTVO Logo">
+            <img src="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048081cbb0b106db5539f7e_Titvologo.png" alt="Logo Titvo">
         </h1>
-        <h1>Security Scan Report</h1>
-        <p>Repository: {{ workspace }}/{{ repo_slug }}</p>
+        <h1>Reporte de Análisis de Seguridad</h1>
+        <p>Repositorio: {{ workspace }}/{{ repo_slug }}</p>
         <p>Commit: {{ commit_sha }}</p>
-        <p>Scan Date: {{ scan_date }}</p>
+        <p>Fecha de Análisis: {{ scan_date }}</p>
     </div>
 
     <div class="summary">
-        <h2>Summary</h2>
-        <p>Total Issues: <span>{{ total_issues }}</span></p>
-        <p>Critical Issues: <span>{{ critical_issues }}</span></p>
-        <p>High Issues: <span>{{ high_issues }}</span></p>
-        <p>Medium Issues: <span>{{ medium_issues }}</span></p>
-        <p>Low Issues: <span>{{ low_issues }}</span></p>
+        <h2>Resumen</h2>
+        <p>Total de Problemas: <span>{{ total_issues }}</span></p>
+        <p>Problemas Críticos: <span>{{ critical_issues }}</span></p>
+        <p>Problemas Altos: <span>{{ high_issues }}</span></p>
+        <p>Problemas Medios: <span>{{ medium_issues }}</span></p>
+        <p>Problemas Bajos: <span>{{ low_issues }}</span></p>
     </div>
 
-    <h2>Issues Found</h2>
+    <h2>Problemas Detectados</h2>
     {% for issue in issues %}
     <div class="issue {{ issue.severity.lower() }}">
         <h3>{{ issue.title }}</h3>
         <div class="severity-badge severity-{{ issue.severity.lower() }}">
-            {{ issue.severity }}
+            {% if issue.severity == 'CRITICAL' %}
+                Crítico
+            {% elif issue.severity == 'HIGH' %}
+                Alto
+            {% elif issue.severity == 'MEDIUM' %}
+                Medio
+            {% elif issue.severity == 'LOW' %}
+                Bajo
+            {% else %}
+                {{ issue.severity }}
+            {% endif %}
         </div>
-        <p><strong>File:</strong> {{ issue.path }}</p>
-        <p><strong>Line:</strong> {{ issue.line }}</p>
-        <p><strong>Code:</strong></p>
+        <p><strong>Archivo:</strong> {{ issue.path }}</p>
+        <p><strong>Línea:</strong> {{ issue.line }}</p>
+        <p><strong>Código:</strong></p>
         <code>{{ issue.code }}</code>
-        <p><strong>Description:</strong></p>
+        <p><strong>Descripción:</strong></p>
         <p>{{ issue.description }}</p>
-        <p><strong>Recommendation:</strong></p>
+        <p><strong>Recomendación:</strong></p>
         <p>{{ issue.recommendation }}</p>
         {% if issue.summary %}
-        <p><strong>Summary:</strong></p>
+        <p><strong>Resumen:</strong></p>
         <p>{{ issue.summary }}</p>
         {% endif %}
     </div>
