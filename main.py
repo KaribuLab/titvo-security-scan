@@ -646,7 +646,7 @@ def is_commit_safe(analysis, source):
     # Si el análisis contiene el patrón de rechazo, el commit no es seguro
     if source == "github" and "[COMMIT_RECHAZADO]" in analysis:
         return False
-    elif source == "bitbucket" and "CRITICAL" in analysis:
+    elif source == "bitbucket" and "CRITICAL" in analysis or "HIGH" in analysis:
         return False
     # Si no se encontró el patrón de rechazo, el commit es seguro
     return True
