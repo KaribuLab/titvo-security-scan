@@ -92,7 +92,8 @@ inputs = {
           "s3:PutObject"
         ],
         "Resource" : [
-          dependency.parameters.outputs.parameters["${local.base_path}/infra/report-bucket-arn"]
+          dependency.parameters.outputs.parameters["${local.base_path}/infra/report-bucket-arn"],
+          "${dependency.parameters.outputs.parameters["${local.base_path}/infra/report-bucket-arn"]}/*"
         ]
       }
     ]
