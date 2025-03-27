@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import uuid
 import base64
@@ -497,23 +498,106 @@ def create_github_issue(
         return None
 
 
+def bitbucket_analysis_to_annotation(analysis, report_id):
+    analysis_lines = analysis.split("\n")
+    annotations = []
+    is_next_line_and_location = False
+    annotation_started = False
+    current_annotation = {}
+    in_summary_section = False
+
+    for _, line in enumerate(analysis_lines):
+        if re.match(r"^## \d+\. (.*)$", line):
+            # Nueva vulnerabilidad
+            if annotation_started and current_annotation:
+                annotations.append(current_annotation)
+                current_annotation = {}
+
+            title = line.split(".")[1].strip()
+            current_annotation["external_id"] = f"{report_id}-annotation-{uuid.uuid4()}"
+            current_annotation["annotation_type"] = "VULNERABILITY"
+            current_annotation["title"] = title
+            current_annotation["description"] = title
+            annotation_started = True
+            is_next_line_and_location = False
+            summary = ""
+            in_summary_section = False
+
+        elif re.match(r"^\*\*Severidad: (.*)$", line):
+            severity_title = line.split(":")[1].replace("**", "").strip()
+            if severity_title == "Crítica":
+                current_annotation["severity"] = "CRITICAL"
+            elif severity_title == "Alta":
+                current_annotation["severity"] = "HIGH"
+            elif severity_title == "Media":
+                current_annotation["severity"] = "MEDIUM"
+            elif severity_title == "Baja":
+                current_annotation["severity"] = "LOW"
+            else:
+                current_annotation["severity"] = "MEDIUM"
+
+        elif "### Ubicación exacta" in line:
+            is_next_line_and_location = True
+            in_summary_section = False
+
+        elif "### Recomendación para solucionarlo" in line:
+            is_next_line_and_location = False
+            in_summary_section = True
+
+        # Procesamiento de ubicación
+        elif is_next_line_and_location and line.strip() and "###" not in line:
+            # El formato es como: `public/util.js` - (línea: 1) - Código malicioso
+            pattern = r"^`([^`]+)`\s+-\s+\(línea:\s+(\d+)\)"
+            match = re.search(pattern, line)
+            if match:
+                # Extraer path y línea
+                path = match.group(1)
+                line_num = int(match.group(2))
+
+                if "path" not in current_annotation:
+                    current_annotation["path"] = path
+                    current_annotation["line"] = line_num
+
+        # Procesamiento de recomendación (summary)
+        elif in_summary_section and line.strip() and "###" not in line:
+            summary = line.strip()[
+                0 : (450 if len(line.strip()) >= 450 else len(line.strip()))
+            ]
+            current_annotation["summary"] = summary
+
+    # Agregar la última anotación si existe
+    if annotation_started and current_annotation:
+        if summary:
+            current_annotation["summary"] = summary.strip()
+        annotations.append(current_annotation)
+
+    return annotations
+
+
 def create_bitbucket_code_insights_report(
     access_token, workspace, repo, commit, is_safe, analysis
 ) -> str:
     """Crea un reporte de código en Bitbucket."""
-    url = (
+    report_id = f"titvo-security-scan-{uuid.uuid4()}"
+    create_report_url = (
         f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
-        f"titvo-security-scan-{uuid.uuid4()}"
+        f"{report_id}"
+    )
+    create_annotation_url = (
+        f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
+        f"{report_id}/annotations"
     )
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
     report_bucket = get_ssm_parameter(
-        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/github-security-scan/report-bucket-name"
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
+        f"github-security-scan/report-bucket-name"
     )
     bucket_domain = get_ssm_parameter(
-        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/github-security-scan/report-bucket-domain"
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
+        f"github-security-scan/report-bucket-domain"
     )
     html_analysis = markdown.markdown(analysis, extensions=["md_in_html"])
     analysis_key = f"scm/bitbucket/scan/{TITVO_SCAN_TASK_ID}.html"
@@ -530,22 +614,31 @@ def create_bitbucket_code_insights_report(
         "reporter": "titvo-security-scan",
         "result": "FAILED" if not is_safe else "SUCCESS",
         "data": [
-            {"title": "Duration in seconds", "type": "DURATION", "value": 14},
             {
                 "title": "Safe to merge?",
                 "type": "BOOLEAN",
                 "value": is_safe,
             },
-            {
-                "title": "Analysis",
-                "type": "STRING",
-                "value": analysis,
-            },
             {"title": "Details", "type": "LINK", "value": report_url},
         ],
     }
-    response = requests.put(url, headers=headers, json=payload, timeout=30)
+    response = requests.put(
+        create_report_url, headers=headers, json=payload, timeout=30
+    )
     if response.status_code == 200:
+        payload = bitbucket_analysis_to_annotation(analysis, report_id)
+        response = requests.post(
+            create_annotation_url, headers=headers, json=payload, timeout=30
+        )
+        if response.status_code == 200:
+            LOGGER.info("Annotation creada exitosamente: %s", create_annotation_url)
+        else:
+            LOGGER.error(
+                "Error al crear la annotation: %s - %s",
+                response.status_code,
+                response.text,
+            )
+            return None
         return report_url
     else:
         LOGGER.error(
