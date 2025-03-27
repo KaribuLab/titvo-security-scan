@@ -544,7 +544,7 @@ def create_bitbucket_code_insights_report(
             {"title": "Details", "type": "LINK", "value": report_url},
         ],
     }
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    response = requests.put(url, headers=headers, json=payload, timeout=30)
     if response.status_code == 200:
         return report_url
     else:
