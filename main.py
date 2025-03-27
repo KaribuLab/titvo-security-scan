@@ -646,6 +646,9 @@ def create_bitbucket_code_insights_report(
             return None
         return report_url
     else:
+        if response.json().get("key", "") == "report-service.report.max-reports":
+            LOGGER.info("El reporte de código en Bitbucket está lleno")
+            return ""
         LOGGER.error(
             "Error al crear el reporte de código en Bitbucket: %s", response.json()
         )
