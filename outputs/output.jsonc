@@ -1,0 +1,16 @@
+{
+    "introduction": "Introducción del análisis de seguridad", // Introducción del análisis de seguridad
+    "number_of_issues": 1, // Número de issues encontrados en el análisis
+    "annotations": [
+        {
+            "title": "Titulo del issue encontrado",
+            "description": "Breve descripción del issue",
+            "severity": "CRITICAL", // CRITICAL, HIGH, MEDIUM, LOW
+            "path": "path/to/file.js", // path del archivo donde se encontró el issue
+            "line": 1, // primera línea del archivo donde se encontró el issue
+            "summary": "Breve resumen del issue en menos de 400 caracteres",
+            "code": "Contenido del código donde se encontró el issue",
+            "recommendation": "Recomendación para corregir el issue"
+        }
+    ]
+}

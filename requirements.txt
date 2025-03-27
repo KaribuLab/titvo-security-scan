@@ -5,3 +5,4 @@ boto3==1.37.13
 pytz==2025.1
 pycryptodome==3.22.0
 requests==2.32.3
+Jinja2==3.1.3

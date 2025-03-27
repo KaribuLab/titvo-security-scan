@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TiTVO Security Scan Report</title>
+    <link rel="icon" type="image/png" href="https://www.titvo.com/favicon.ico">
+    <style>
+        :root {
+            --titvo-primary: #1a73e8;
+            --titvo-secondary: #4285f4;
+            --titvo-accent: #34a853;
+            --titvo-danger: #ea4335;
+            --titvo-warning: #fbbc05;
+            --titvo-success: #34a853;
+            --titvo-light: #f8f9fa;
+            --titvo-dark: #202124;
+        }
+
+        body {
+            font-family: 'Google Sans', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            color: var(--titvo-dark);
+            background-color: #ffffff;
+        }
+
+        .header {
+            background-color: var(--titvo-light);
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: var(--titvo-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header h1 img {
+            height: 50px;
+        }
+
+        .issue {
+            border: 1px solid #e8eaed;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .issue:hover {
+            transform: translateY(-2px);
+        }
+
+        .critical { border-left: 5px solid var(--titvo-danger); }
+        .high { border-left: 5px solid var(--titvo-warning); }
+        .medium { border-left: 5px solid var(--titvo-secondary); }
+        .low { border-left: 5px solid var(--titvo-success); }
+
+        .summary {
+            background-color: var(--titvo-light);
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .summary h2 {
+            color: var(--titvo-primary);
+            margin-top: 0;
+        }
+
+        .summary p {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e8eaed;
+        }
+
+        .summary p:last-child {
+            border-bottom: none;
+        }
+
+        h2 {
+            color: var(--titvo-primary);
+            margin-top: 30px;
+        }
+
+        .issue h3 {
+            color: var(--titvo-primary);
+            margin-top: 0;
+        }
+
+        code {
+            background-color: var(--titvo-light);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            display: block;
+            margin: 10px 0;
+        }
+
+        strong {
+            color: var(--titvo-dark);
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin: 5px 0;
+        }
+
+        .severity-critical { background-color: #fce8e6; color: var(--titvo-danger); }
+        .severity-high { background-color: #fef7e0; color: var(--titvo-warning); }
+        .severity-medium { background-color: #e8f0fe; color: var(--titvo-secondary); }
+        .severity-low { background-color: #e6f4ea; color: var(--titvo-success); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <img src="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048081cbb0b106db5539f7e_Titvologo.png" alt="TiTVO Logo">
+        </h1>
+        <h1>Security Scan Report</h1>
+        <p>Repository: {{ workspace }}/{{ repo_slug }}</p>
+        <p>Commit: {{ commit_sha }}</p>
+        <p>Scan Date: {{ scan_date }}</p>
+    </div>
+
+    <div class="summary">
+        <h2>Summary</h2>
+        <p>Total Issues: <span>{{ total_issues }}</span></p>
+        <p>Critical Issues: <span>{{ critical_issues }}</span></p>
+        <p>High Issues: <span>{{ high_issues }}</span></p>
+        <p>Medium Issues: <span>{{ medium_issues }}</span></p>
+        <p>Low Issues: <span>{{ low_issues }}</span></p>
+    </div>
+
+    <h2>Issues Found</h2>
+    {% for issue in issues %}
+    <div class="issue {{ issue.severity.lower() }}">
+        <h3>{{ issue.title }}</h3>
+        <div class="severity-badge severity-{{ issue.severity.lower() }}">
+            {{ issue.severity }}
+        </div>
+        <p><strong>File:</strong> {{ issue.path }}</p>
+        <p><strong>Line:</strong> {{ issue.line }}</p>
+        <p><strong>Code:</strong></p>
+        <code>{{ issue.code }}</code>
+        <p><strong>Description:</strong></p>
+        <p>{{ issue.description }}</p>
+        <p><strong>Recommendation:</strong></p>
+        <p>{{ issue.recommendation }}</p>
+        {% if issue.summary %}
+        <p><strong>Summary:</strong></p>
+        <p>{{ issue.summary }}</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</body>
+</html> 

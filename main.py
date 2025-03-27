@@ -1,6 +1,5 @@
 import os
 import sys
-import re
 import json
 import uuid
 import base64
@@ -16,7 +15,7 @@ import pytz
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 import requests
-import markdown
+from jinja2 import Environment, FileSystemLoader
 
 # Configurar el logger
 logging.basicConfig(
@@ -86,7 +85,7 @@ def get_anthropic_api_key():
     return get_ssm_parameter(param_name)
 
 
-def get_system_prompt():
+def get_base_prompt():
     """Obtiene el system prompt desde Parameter Store."""
     param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
     param_name = f"{param_path}/github-security-scan/system-prompt"
@@ -384,21 +383,12 @@ def generate_security_analysis_prompt(repo_info: dict, contenido_archivos: str) 
     return f"""
     A continuación te proporciono el código fuente de un commit específico 
     del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
-    
-    El formato de presentación es el siguiente:
-    - Cada archivo se presenta con su nombre en formato **Archivo: ruta/al/archivo**
-    - Seguido por el contenido del archivo dentro de un bloque de código markdown
-    
-    Analiza el código y proporciona un resumen de las vulnerabilidades encontradas en formato markdown, organizadas por tipo de vulnerabilidad y severidad.
-    
-    Recuerda que debes comenzar tu respuesta con el patrón [COMMIT_RECHAZADO] o [COMMIT_APROBADO] según corresponda.
-    
     Código fuente a analizar:{contenido_archivos}
     """
 
 
 def analyze_code(
-    client, system_prompt: str, user_prompt: str, scan_id: str
+    client, system_prompt: str, user_prompt: str, scan_id: str, source: str
 ) -> tuple[bool, str]:
     """Realiza el análisis de seguridad del código.
 
@@ -415,7 +405,6 @@ def analyze_code(
         # Enviar la solicitud a Claude
         respuesta = client.messages.create(
             model=MODEL,
-            max_tokens=4000,
             temperature=0.7,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
@@ -429,7 +418,7 @@ def analyze_code(
         LOGGER.info("Respuesta :\n%s", analysis)
 
         # Verificar si el commit es seguro
-        if not is_commit_safe(analysis):
+        if not is_commit_safe(analysis, source):
             LOGGER.error(
                 "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
             )
@@ -498,81 +487,65 @@ def create_github_issue(
         return None
 
 
-def bitbucket_analysis_to_annotation(analysis, report_id):
-    analysis_lines = analysis.split("\n")
+def bitbucket_analysis_to_annotation(analysis_annotations, report_id):
     annotations = []
-    is_next_line_and_location = False
-    annotation_started = False
-    current_annotation = {}
-    in_summary_section = False
-
-    for _, line in enumerate(analysis_lines):
-        if re.match(r"^## \d+\. (.*)$", line):
-            # Nueva vulnerabilidad
-            if annotation_started and current_annotation:
-                annotations.append(current_annotation)
-                current_annotation = {}
-
-            title = line.split(".")[1].strip()
-            current_annotation["external_id"] = f"{report_id}-annotation-{uuid.uuid4()}"
-            current_annotation["annotation_type"] = "VULNERABILITY"
-            current_annotation["title"] = title
-            current_annotation["description"] = title
-            annotation_started = True
-            is_next_line_and_location = False
-            summary = ""
-            in_summary_section = False
-
-        elif re.match(r"^\*\*Severidad: (.*)$", line):
-            severity_title = line.split(":")[1].replace("**", "").strip()
-            if severity_title == "Crítica":
-                current_annotation["severity"] = "CRITICAL"
-            elif severity_title == "Alta":
-                current_annotation["severity"] = "HIGH"
-            elif severity_title == "Media":
-                current_annotation["severity"] = "MEDIUM"
-            elif severity_title == "Baja":
-                current_annotation["severity"] = "LOW"
-            else:
-                current_annotation["severity"] = "MEDIUM"
-
-        elif "### Ubicación exacta" in line:
-            is_next_line_and_location = True
-            in_summary_section = False
-
-        elif "### Recomendación para solucionarlo" in line:
-            is_next_line_and_location = False
-            in_summary_section = True
-
-        # Procesamiento de ubicación
-        elif is_next_line_and_location and line.strip() and "###" not in line:
-            # El formato es como: `public/util.js` - (línea: 1) - Código malicioso
-            pattern = r"^`([^`]+)`\s+-\s+\(línea:\s+(\d+)\)"
-            match = re.search(pattern, line)
-            if match:
-                # Extraer path y línea
-                path = match.group(1)
-                line_num = int(match.group(2))
-
-                if "path" not in current_annotation:
-                    current_annotation["path"] = path
-                    current_annotation["line"] = line_num
-
-        # Procesamiento de recomendación (summary)
-        elif in_summary_section and line.strip() and "###" not in line:
-            summary = line.strip()[
-                0 : (450 if len(line.strip()) >= 450 else len(line.strip()))
-            ]
-            current_annotation["summary"] = summary
-
-    # Agregar la última anotación si existe
-    if annotation_started and current_annotation:
-        if summary:
-            current_annotation["summary"] = summary.strip()
+    for item in analysis_annotations:
+        current_annotation = {}
+        current_annotation["external_id"] = f"{report_id}-annotation-{uuid.uuid4()}"
+        current_annotation["annotation_type"] = "VULNERABILITY"
+        current_annotation["title"] = item.get("title")
+        current_annotation["description"] = item.get("description")
+        current_annotation["severity"] = item.get("severity")
+        current_annotation["path"] = item.get("path")
+        current_annotation["line"] = item.get("line")
+        current_annotation["summary"] = item.get("summary")
         annotations.append(current_annotation)
 
     return annotations
 
+def create_bitbucket_issue_html(json_analysis):
+    """Genera el HTML del análisis usando una plantilla Jinja2."""
+    try:
+        # Configurar el entorno de Jinja2
+        env = Environment(loader=FileSystemLoader('templates'))
+        template = env.get_template('bitbucket_report.html')
+
+        # Preparar los datos para la plantilla
+        issues = json_analysis.get('annotations', [])
+        total_issues = len(issues)
+        
+        # Contar issues por severidad
+        severity_counts = {
+            'critical': 0,
+            'high': 0,
+            'medium': 0,
+            'low': 0
+        }
+        
+        for issue in issues:
+            severity = issue.get('severity', '').lower()
+            if severity in severity_counts:
+                severity_counts[severity] += 1
+
+        # Renderizar la plantilla
+        html_content = template.render(
+            workspace=json_analysis.get('workspace', ''),
+            repo_slug=json_analysis.get('repo_slug', ''),
+            commit_sha=json_analysis.get('commit_sha', ''),
+            scan_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            total_issues=total_issues,
+            recommendation=json_analysis.get('recommendation', ''),
+            critical_issues=severity_counts['critical'],
+            high_issues=severity_counts['high'],
+            medium_issues=severity_counts['medium'],
+            low_issues=severity_counts['low'],
+            issues=issues
+        )
+        
+        return html_content
+    except Exception as e:
+        LOGGER.error("Error al generar el HTML del reporte: %s", e)
+        return "<html><body><h1>Error al generar el reporte</h1><p>Ha ocurrido un error al generar el reporte HTML.</p></body></html>"
 
 def create_bitbucket_code_insights_report(
     access_token, workspace, repo, commit, is_safe, analysis
@@ -599,7 +572,13 @@ def create_bitbucket_code_insights_report(
         f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
         f"github-security-scan/report-bucket-domain"
     )
-    html_analysis = markdown.markdown(analysis, extensions=["md_in_html"])
+    json_analysis = json.loads(analysis)
+    # Añadir información adicional para la plantilla
+    json_analysis['workspace'] = workspace
+    json_analysis['repo_slug'] = repo
+    json_analysis['commit_sha'] = commit
+    analisys_annotations = json_analysis.get("annotations", [])
+    html_analysis = create_bitbucket_issue_html(json_analysis)
     analysis_key = f"scm/bitbucket/scan/{TITVO_SCAN_TASK_ID}.html"
     s3.put_object(
         Bucket=report_bucket,
@@ -622,6 +601,11 @@ def create_bitbucket_code_insights_report(
                 "value": is_safe,
             },
             {
+                "title": "Number of issues",
+                "type": "NUMBER",
+                "value": len(json_analysis.get("number_of_issues", 0)),
+            },
+            {
                 "title": "Report",
                 "type": "LINK",
                 "value": {"text": "See full report", "href": report_url},
@@ -632,7 +616,7 @@ def create_bitbucket_code_insights_report(
         create_report_url, headers=headers, json=payload, timeout=30
     )
     if response.status_code == 200:
-        payload = bitbucket_analysis_to_annotation(analysis, report_id)
+        payload = bitbucket_analysis_to_annotation(analisys_annotations, report_id)
         response = requests.post(
             create_annotation_url, headers=headers, json=payload, timeout=30
         )
@@ -656,15 +640,13 @@ def create_bitbucket_code_insights_report(
         return None
 
 
-def is_commit_safe(analysis):
+def is_commit_safe(analysis, source):
     """Determina si el commit es seguro basado en el análisis de Claude."""
-    # Buscar el patrón específico que indica rechazo
-    patron_rechazo = "[COMMIT_RECHAZADO]"
-
     # Si el análisis contiene el patrón de rechazo, el commit no es seguro
-    if patron_rechazo in analysis:
+    if source == "github" and "[COMMIT_RECHAZADO]" in analysis:
         return False
-
+    elif source == "bitbucket" and "CRITICAL" in analysis:
+        return False
     # Si no se encontró el patrón de rechazo, el commit es seguro
     return True
 
@@ -777,6 +759,13 @@ def decrypt(data):
         return None
 
 
+def get_output_format(source):
+    """Obtiene el formato de salida desde Parameter Store."""
+    return get_ssm_parameter(
+        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/github-security-scan/output/{source}"
+    )
+
+
 def main():
     """Función principal para obtener una respuesta de Claude."""
     LOGGER.info("Iniciando análisis de seguridad")
@@ -803,15 +792,23 @@ def main():
             TITVO_SCAN_TASK_ID,
         )
     # Obtener el system prompt desde Parameter Store
-    system_prompt = get_system_prompt()
-    if not system_prompt:
+    base_prompt = get_base_prompt()
+    if not base_prompt:
         exit_with_error(
-            "No se pudo obtener el system prompt desde Parameter Store. "
+            "No se pudo obtener el base prompt desde Parameter Store. "
             "Este parámetro es obligatorio.",
             TITVO_SCAN_TASK_ID,
         )
     LOGGER.info("System prompt obtenido correctamente")
-
+    output_format = get_output_format(item_scan.get("source"))
+    if not output_format:
+        exit_with_error(
+            "No se pudo obtener el formato de salida desde Parameter Store. "
+            "Este parámetro es obligatorio.",
+            TITVO_SCAN_TASK_ID,
+        )
+    LOGGER.info("Formato de salida obtenido correctamente")
+    system_prompt = f"{base_prompt}\n\n{output_format}"
     # Inicializar el cliente de Anthropic
     client = Anthropic(api_key=get_anthropic_api_key())
     LOGGER.info("Enviando código para análisis")
@@ -856,7 +853,11 @@ def main():
 
             # Realizar el análisis
             is_safe, analysis = analyze_code(
-                client, system_prompt, user_prompt, TITVO_SCAN_TASK_ID
+                client,
+                system_prompt,
+                user_prompt,
+                TITVO_SCAN_TASK_ID,
+                item_scan.get("source"),
             )
             if not is_safe:
                 # Crear un issue en GitHub solo si se detectan vulnerabilidades
@@ -941,7 +942,11 @@ def main():
 
             # Realizar el análisis
             is_safe, analysis = analyze_code(
-                client, system_prompt, user_prompt, TITVO_SCAN_TASK_ID
+                client,
+                system_prompt,
+                user_prompt,
+                TITVO_SCAN_TASK_ID,
+                item_scan.get("source"),
             )
             if not is_safe:
                 report_url = create_bitbucket_code_insights_report(
