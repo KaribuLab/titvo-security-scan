@@ -82,7 +82,7 @@ inputs = {
           "secretsmanager:GetSecretValue"
         ],
         "Resource" : [
-          "${dependency.parameters.outputs.parameters["${local.base_path}/infra/secret-manager-arn"]}"
+          "arn:aws:secretsmanager:*:*:secret:/tvo/security-scan/prod*"
         ]
       }
     ]
