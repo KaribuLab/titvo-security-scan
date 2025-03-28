@@ -886,7 +886,7 @@ def main():
             else:
                 update_scan_status(
                     TITVO_SCAN_TASK_ID,
-                    "SUCCESS",
+                    "COMPLETED",
                     {},
                 )
 
@@ -982,7 +982,7 @@ def main():
             else:
                 update_scan_status(
                     TITVO_SCAN_TASK_ID,
-                    "SUCCESS",
+                    "COMPLETED",
                     {},
                 )
 
