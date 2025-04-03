@@ -80,6 +80,16 @@ inputs = {
       {
         "Effect" : "Allow",
         "Action" : [
+          "dynamodb:Query"
+        ],
+        "Resource" : [
+          dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-cli-files-table-arn"],
+          "${dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-cli-files-table-arn"]}/index/*"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
           "secretsmanager:GetSecretValue"
         ],
         "Resource" : [
