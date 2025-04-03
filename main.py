@@ -504,12 +504,12 @@ def bitbucket_analysis_to_annotation(analysis_annotations, report_id):
 
     return annotations
 
-def create_bitbucket_issue_html(json_analysis):
+def create_issue_html(json_analysis):
     """Genera el HTML del análisis usando una plantilla Jinja2."""
     try:
         # Configurar el entorno de Jinja2
         env = Environment(loader=FileSystemLoader('templates'))
-        template = env.get_template('bitbucket_report.html')
+        template = env.get_template('report_template.html')
 
         # Preparar los datos para la plantilla
         issues = json_analysis.get('annotations', [])
@@ -579,7 +579,7 @@ def create_bitbucket_code_insights_report(
     json_analysis['repo_slug'] = repo
     json_analysis['commit_sha'] = commit
     analisys_annotations = json_analysis.get("annotations", [])
-    html_analysis = create_bitbucket_issue_html(json_analysis)
+    html_analysis = create_issue_html(json_analysis)
     analysis_key = f"scm/bitbucket/scan/{TITVO_SCAN_TASK_ID}.html"
     s3.put_object(
         Bucket=report_bucket,
