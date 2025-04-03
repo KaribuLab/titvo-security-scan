@@ -702,19 +702,19 @@ def get_output_format(source):
 
 def generate_and_upload_html_report(json_analysis, scan_id, source):
     """Genera el reporte HTML basado en el análisis y lo sube a S3.
-    
+
     Args:
         json_analysis (dict): Análisis de seguridad en formato JSON
         scan_id (str): ID del escaneo
         source (str): Fuente del análisis (github, bitbucket, cli)
-    
+
     Returns:
         str: URL del reporte subido a S3, o None en caso de error
     """
     try:
         # Generar el HTML usando la plantilla
         html_analysis = create_issue_html(json_analysis)
-        
+
         # Obtener el nombre del bucket y el dominio desde SSM
         report_bucket = get_ssm_parameter(
             f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
@@ -724,14 +724,14 @@ def generate_and_upload_html_report(json_analysis, scan_id, source):
             f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
             f"github-security-scan/report-bucket-domain"
         )
-        
+
         if not report_bucket or not bucket_domain:
             LOGGER.error("No se pudo obtener el nombre del bucket o el dominio")
             return None
-        
+
         # Definir la clave del archivo en S3 usando el source proporcionado
         analysis_key = f"scm/{source}/scan/{scan_id}.html"
-        
+
         # Subir el archivo HTML a S3
         s3.put_object(
             Bucket=report_bucket,
@@ -739,11 +739,11 @@ def generate_and_upload_html_report(json_analysis, scan_id, source):
             Body=html_analysis,
             ContentType="text/html; charset=utf-8",
         )
-        
+
         # Construir y devolver la URL completa del reporte
         report_url = f"{bucket_domain}/{analysis_key}"
         LOGGER.info("Reporte HTML creado y subido a S3: %s", report_url)
-        
+
         return report_url
     except Exception as e:
         LOGGER.error("Error al generar y subir el reporte HTML: %s", e)
@@ -858,8 +858,7 @@ def is_commit_safe(analysis, source):
     # Si el análisis contiene el patrón de rechazo, el commit no es seguro
     if source == "github" and "[COMMIT_RECHAZADO]" in analysis:
         return False
-    elif (source == "bitbucket" and 
-          ("CRITICAL" in analysis or "HIGH" in analysis)):
+    elif source == "bitbucket" and ("CRITICAL" in analysis or "HIGH" in analysis):
         return False
     # Si no se encontró el patrón de rechazo, el commit es seguro
     return True
@@ -1140,12 +1139,19 @@ def main():
                     {},
                 )
         elif item_scan.get("source") == "cli":
-            # Descargar archivos del repositorio
-            if not cli_file_download(item_scan.get("args").get("cli_file_key")):
+            batch_id = item_scan.get("args").get("batch_id", "").replace('"', "")
+            if batch_id == "":
                 exit_with_error(
-                    "No se pudieron descargar los archivos del repositorio de CLI",
+                    "No se pudo obtener el batch_id",
                     TITVO_SCAN_TASK_ID,
                 )
+            # Descargar archivos del repositorio
+            for file in get_cli_files_by_batch_id(batch_id):
+                if not cli_file_download(file.get("file_key")):
+                    exit_with_error(
+                        "No se pudieron descargar los archivos del repositorio de CLI",
+                        TITVO_SCAN_TASK_ID,
+                    )
             # Obtener el contenido de los archivos
             file_content = get_files_content()
             LOGGER.info("Contenido del archivo: %s", file_content)
