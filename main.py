@@ -3,6 +3,7 @@ import sys
 import json
 import uuid
 import base64
+import tarfile
 from base64 import b64decode
 import logging
 from datetime import datetime
@@ -328,7 +329,7 @@ def bitbucket_download_repository_files(
 
 def get_files_content():
     """Obtiene el contenido de todos los archivos descargados."""
-    contenido_archivos = ""
+    files_content = ""
     LOGGER.info("Obteniendo contenido de los archivos descargados")
 
     # Recorrer el directorio repo_files
@@ -346,7 +347,7 @@ def get_files_content():
                     contenido = f.read()
 
                 # Añadir el nombre del archivo antes del bloque de código
-                contenido_archivos += (
+                files_content += (
                     f"\n\n**Archivo: {ruta_relativa}**\n```\n{contenido}\n```"
                 )
                 LOGGER.debug(
@@ -356,20 +357,20 @@ def get_files_content():
             except Exception as e:
                 # pylint: enable=broad-exception-caught
                 LOGGER.error("Error al leer el archivo %s: %s", ruta_relativa, e)
-                contenido_archivos += (
+                files_content += (
                     f"\n\n**Archivo: {ruta_relativa}**\n```\n"
                     f"Error al leer el archivo: {e}\n```"
                 )
 
-    return contenido_archivos
+    return files_content
 
 
-def generate_security_analysis_prompt(repo_info: dict, contenido_archivos: str) -> str:
+def generate_security_analysis_prompt(repo_info: dict, files_content: str) -> str:
     """Genera el prompt para el análisis de seguridad.
 
     Args:
         repo_info (dict): Diccionario con la información del repositorio
-        contenido_archivos (str): Contenido de los archivos a analizar
+        files_content (str): Contenido de los archivos a analizar
 
     Returns:
         str: El prompt generado
@@ -383,7 +384,7 @@ def generate_security_analysis_prompt(repo_info: dict, contenido_archivos: str) 
     return f"""
     A continuación te proporciono el código fuente de un commit específico 
     del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
-    Código fuente a analizar:{contenido_archivos}
+    Código fuente a analizar:{files_content}
     """
 
 
@@ -504,167 +505,93 @@ def bitbucket_analysis_to_annotation(analysis_annotations, report_id):
 
     return annotations
 
+
 def create_issue_html(json_analysis):
     """Genera el HTML del análisis usando una plantilla Jinja2."""
     try:
         # Configurar el entorno de Jinja2
-        env = Environment(loader=FileSystemLoader('templates'))
-        template = env.get_template('report_template.html')
+        env = Environment(loader=FileSystemLoader("templates"))
+        template = env.get_template("report_template.html")
 
         # Preparar los datos para la plantilla
-        issues = json_analysis.get('annotations', [])
+        issues = json_analysis.get("annotations", [])
         total_issues = len(issues)
-        
+
         # Contar issues por severidad
-        severity_counts = {
-            'critical': 0,
-            'high': 0,
-            'medium': 0,
-            'low': 0
-        }
-        
+        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+
         for issue in issues:
-            severity = issue.get('severity', '').lower()
+            severity = issue.get("severity", "").lower()
             if severity in severity_counts:
                 severity_counts[severity] += 1
 
         # Renderizar la plantilla
         html_content = template.render(
-            workspace=json_analysis.get('workspace', ''),
-            repo_slug=json_analysis.get('repo_slug', ''),
-            commit_sha=json_analysis.get('commit_sha', ''),
-            scan_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            workspace=json_analysis.get("workspace", ""),
+            repo_slug=json_analysis.get("repo_slug", ""),
+            commit_sha=json_analysis.get("commit_sha", ""),
+            scan_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             total_issues=total_issues,
-            recommendation=json_analysis.get('recommendation', ''),
-            critical_issues=severity_counts['critical'],
-            high_issues=severity_counts['high'],
-            medium_issues=severity_counts['medium'],
-            low_issues=severity_counts['low'],
-            issues=issues
+            recommendation=json_analysis.get("recommendation", ""),
+            critical_issues=severity_counts["critical"],
+            high_issues=severity_counts["high"],
+            medium_issues=severity_counts["medium"],
+            low_issues=severity_counts["low"],
+            issues=issues,
         )
-        
+
         return html_content
     except Exception as e:
         LOGGER.error("Error al generar el HTML del reporte: %s", e)
         return "<html><body><h1>Error al generar el reporte</h1><p>Ha ocurrido un error al generar el reporte HTML.</p></body></html>"
 
-def create_bitbucket_code_insights_report(
-    access_token, workspace, repo, commit, is_safe, analysis
-) -> str:
-    """Crea un reporte de código en Bitbucket."""
-    report_id = f"titvo-security-scan-{uuid.uuid4()}"
-    create_report_url = (
-        f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
-        f"{report_id}"
-    )
-    create_annotation_url = (
-        f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
-        f"{report_id}/annotations"
-    )
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
-    report_bucket = get_ssm_parameter(
-        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
-        f"github-security-scan/report-bucket-name"
-    )
-    bucket_domain = get_ssm_parameter(
-        f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
-        f"github-security-scan/report-bucket-domain"
-    )
-    json_analysis = json.loads(analysis)
-    # Añadir información adicional para la plantilla
-    json_analysis['workspace'] = workspace
-    json_analysis['repo_slug'] = repo
-    json_analysis['commit_sha'] = commit
-    analisys_annotations = json_analysis.get("annotations", [])
-    html_analysis = create_issue_html(json_analysis)
-    analysis_key = f"scm/bitbucket/scan/{TITVO_SCAN_TASK_ID}.html"
-    s3.put_object(
-        Bucket=report_bucket,
-        Key=analysis_key,
-        Body=html_analysis,
-        ContentType="text/html; charset=utf-8",
-    )
-    report_url = f"{bucket_domain}/{analysis_key}"
-    LOGGER.info("Reporte creado en S3: %s", report_url)
-    payload = {
-        "title": "Titvo Security Scan",
-        "details": "Security scan report",
-        "report_type": "SECURITY",
-        "reporter": "titvo-security-scan",
-        "result": "FAILED" if not is_safe else "SUCCESS",
-        "data": [
-            {
-                "title": "Safe to merge?",
-                "type": "BOOLEAN",
-                "value": is_safe,
-            },
-            {
-                "title": "Number of issues",
-                "type": "NUMBER",
-                "value": json_analysis.get("number_of_issues", 0),
-            },
-            {
-                "title": "Report",
-                "type": "LINK",
-                "value": {"text": "See full report", "href": report_url},
-            },
-        ],
-    }
-    response = requests.put(
-        create_report_url, headers=headers, json=payload, timeout=30
-    )
-    if response.status_code == 200:
-        payload = bitbucket_analysis_to_annotation(analisys_annotations, report_id)
-        response = requests.post(
-            create_annotation_url, headers=headers, json=payload, timeout=30
-        )
-        if response.status_code == 200:
-            LOGGER.info("Annotation creada exitosamente: %s", create_annotation_url)
-        else:
-            LOGGER.error(
-                "Error al crear la annotation: %s - %s",
-                response.status_code,
-                response.text,
-            )
-            return None
-        return report_url
-    else:
-        if response.json().get("key", "") == "report-service.report.max-reports":
-            LOGGER.info("El reporte de código en Bitbucket está lleno")
-            return ""
-        LOGGER.error(
-            "Error al crear el reporte de código en Bitbucket: %s", response.json()
-        )
+
+def cli_file_download(file_key):
+    """Descarga un archivo gzip desde S3 y extrae su contenido en el directorio repo_files.
+
+    Maneja archivos tar.gz que contienen múltiples archivos.
+    """
+    try:
+        # Crear directorio repo_files si no existe
+        os.makedirs("repo_files", exist_ok=True)
+
+        # Nombre temporal para el archivo comprimido
+        temp_gz_file = os.path.join("repo_files", os.path.basename(file_key))
+
+        LOGGER.info("Descargando archivo %s desde S3", file_key)
+
+        # Descargar el archivo comprimido desde S3
+        file_gz = s3.get_object(Bucket=get_cli_files_bucket_name(), Key=file_key)
+
+        # Guardar el archivo comprimido temporalmente
+        with open(temp_gz_file, "wb") as f:
+            f.write(file_gz["Body"].read())
+
+        LOGGER.info("Descomprimiendo archivo %s", temp_gz_file)
+
+        # Es un tarball, extraer múltiples archivos
+        with tarfile.open(temp_gz_file, "r:gz") as tar:
+            # Extraer todos los archivos en repo_files
+            tar.extractall(path="repo_files")
+            # Obtener la lista de archivos extraídos
+            extracted_files = [member.name for member in tar.getmembers()]
+            LOGGER.info("Extraídos %d archivos del tarball", len(extracted_files))
+
+        # Eliminar el archivo comprimido temporal
+        os.remove(temp_gz_file)
+
+        LOGGER.info("Extracción completada en directorio repo_files")
+        return extracted_files
+    except Exception as e:
+        LOGGER.error("Error al descargar y extraer el archivo desde S3: %s", e)
         return None
-
-
-def is_commit_safe(analysis, source):
-    """Determina si el commit es seguro basado en el análisis de Claude."""
-    # Si el análisis contiene el patrón de rechazo, el commit no es seguro
-    if source == "github" and "[COMMIT_RECHAZADO]" in analysis:
-        return False
-    elif source == "bitbucket" and "CRITICAL" in analysis or "HIGH" in analysis:
-        return False
-    # Si no se encontró el patrón de rechazo, el commit es seguro
-    return True
-
-
-def get_table_name():
-    """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
-    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
-    param_name = f"{param_path}/task-trigger/dynamo-task-table-name"
-
-    return get_ssm_parameter(param_name)
 
 
 def get_scan_item(scan_id):
     """Obtiene el item de escaneo desde DynamoDB usando el scan_id."""
     try:
         # Obtener el nombre de la tabla
-        nombre_tabla = get_table_name()
+        nombre_tabla = get_task_table_name()
         if not nombre_tabla:
             LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
             return None
@@ -695,7 +622,7 @@ def get_scan_item(scan_id):
 def update_scan_status(scan_id, status, result=None):
     """Actualiza el estado del escaneo en DynamoDB y opcionalmente el resultado."""
     # Obtener el nombre de la tabla
-    nombre_tabla = get_table_name()
+    nombre_tabla = get_task_table_name()
     if not nombre_tabla:
         LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
         return False
@@ -767,6 +694,229 @@ def get_output_format(source):
     )
 
 
+def generate_and_upload_html_report(json_analysis, scan_id, source):
+    """Genera el reporte HTML basado en el análisis y lo sube a S3.
+
+    Args:
+        json_analysis (dict): Análisis de seguridad en formato JSON
+        scan_id (str): ID del escaneo
+        source (str): Fuente del análisis (github, bitbucket, cli)
+
+    Returns:
+        str: URL del reporte subido a S3, o None en caso de error
+    """
+    try:
+        # Generar el HTML usando la plantilla
+        html_analysis = create_issue_html(json_analysis)
+
+        # Obtener el nombre del bucket y el dominio desde SSM
+        report_bucket = get_ssm_parameter(
+            f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
+            f"github-security-scan/report-bucket-name"
+        )
+        bucket_domain = get_ssm_parameter(
+            f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}/"
+            f"github-security-scan/report-bucket-domain"
+        )
+
+        if not report_bucket or not bucket_domain:
+            LOGGER.error("No se pudo obtener el nombre del bucket o el dominio")
+            return None
+
+        # Definir la clave del archivo en S3 usando el source proporcionado
+        analysis_key = f"scm/{source}/scan/{scan_id}.html"
+
+        # Subir el archivo HTML a S3
+        s3.put_object(
+            Bucket=report_bucket,
+            Key=analysis_key,
+            Body=html_analysis,
+            ContentType="text/html; charset=utf-8",
+        )
+
+        # Construir y devolver la URL completa del reporte
+        report_url = f"{bucket_domain}/{analysis_key}"
+        LOGGER.info("Reporte HTML creado y subido a S3: %s", report_url)
+
+        return report_url
+    except Exception as e:
+        LOGGER.error("Error al generar y subir el reporte HTML: %s", e)
+        return None
+
+
+def create_bitbucket_code_insights_report(
+    access_token, workspace, repo, commit, is_safe, analysis, source
+) -> str:
+    """Crea un reporte de código en Bitbucket."""
+    try:
+        report_id = f"titvo-security-scan-{uuid.uuid4()}"
+        create_report_url = (
+            f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
+            f"{report_id}"
+        )
+        create_annotation_url = (
+            f"{BITBUCKET_API_URL}/repositories/{workspace}/{repo}/commit/{commit}/reports/"
+            f"{report_id}/annotations"
+        )
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+        # Parsear el análisis JSON
+        json_analysis = json.loads(analysis)
+
+        # Añadir información adicional para la plantilla
+        json_analysis["workspace"] = workspace
+        json_analysis["repo_slug"] = repo
+        json_analysis["commit_sha"] = commit
+
+        # Generar y subir el reporte HTML, pasando el source
+        report_url = generate_and_upload_html_report(
+            json_analysis, TITVO_SCAN_TASK_ID, source
+        )
+        if not report_url:
+            LOGGER.error("No se pudo generar o subir el reporte HTML")
+            return None
+
+        # Obtener las anotaciones del análisis
+        analysis_annotations = json_analysis.get("annotations", [])
+
+        # Crear el payload del reporte para Bitbucket
+        payload = {
+            "title": "Titvo Security Scan",
+            "details": "Security scan report",
+            "report_type": "SECURITY",
+            "reporter": "titvo-security-scan",
+            "result": "FAILED" if not is_safe else "SUCCESS",
+            "data": [
+                {
+                    "title": "Safe to merge?",
+                    "type": "BOOLEAN",
+                    "value": is_safe,
+                },
+                {
+                    "title": "Number of issues",
+                    "type": "NUMBER",
+                    "value": json_analysis.get("number_of_issues", 0),
+                },
+                {
+                    "title": "Report",
+                    "type": "LINK",
+                    "value": {"text": "See full report", "href": report_url},
+                },
+            ],
+        }
+
+        # Crear el reporte en Bitbucket
+        response = requests.put(
+            create_report_url, headers=headers, json=payload, timeout=30
+        )
+
+        if response.status_code != 200:
+            if response.json().get("key", "") == "report-service.report.max-reports":
+                LOGGER.info("El reporte de código en Bitbucket está lleno")
+                return ""
+            LOGGER.error(
+                "Error al crear el reporte de código en Bitbucket: %s", response.json()
+            )
+            return None
+
+        # Crear las anotaciones si hay alguna
+        if analysis_annotations:
+            annotation_payload = bitbucket_analysis_to_annotation(
+                analysis_annotations, report_id
+            )
+            annotation_response = requests.post(
+                create_annotation_url,
+                headers=headers,
+                json=annotation_payload,
+                timeout=30,
+            )
+
+            if annotation_response.status_code != 200:
+                LOGGER.error(
+                    "Error al crear las anotaciones: %s - %s",
+                    annotation_response.status_code,
+                    annotation_response.text,
+                )
+
+        return report_url
+    except Exception as e:
+        LOGGER.error("Error al crear el reporte de código en Bitbucket: %s", e)
+        return None
+
+
+def is_commit_safe(analysis, source):
+    """Determina si el commit es seguro basado en el análisis de Claude."""
+    # Si el análisis contiene el patrón de rechazo, el commit no es seguro
+    if source == "github" and "[COMMIT_RECHAZADO]" in analysis:
+        return False
+    elif source == "bitbucket" and "CRITICAL" in analysis or "HIGH" in analysis:
+        return False
+    # Si no se encontró el patrón de rechazo, el commit es seguro
+    return True
+
+
+def get_task_table_name():
+    """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/task-trigger/dynamo-task-table-name"
+
+    return get_ssm_parameter(param_name)
+
+
+def get_cli_files_table_name():
+    """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/github-security-scan/dynamo-client-file-table-name"
+
+    return get_ssm_parameter(param_name)
+
+
+def get_cli_files_bucket_name():
+    """Obtiene el nombre del bucket de S3 desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/github-security-scan/s3-client-file-bucket-name"
+
+    return get_ssm_parameter(param_name)
+
+
+def get_cli_files_by_batch_id(batch_id):
+    """Obtiene los archivos de un batch desde DynamoDB."""
+    try:
+        # Obtener el nombre de la tabla
+        table_name = get_cli_files_table_name()
+        if not table_name:
+            LOGGER.error("No se pudo obtener el nombre de la tabla DynamoDB")
+            return None
+
+        # Inicializar el cliente de DynamoDB
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        # Crear la consulta equivalente al código Node.js
+        response = table.query(
+            IndexName="batch_id_gsi",
+            KeyConditionExpression="batch_id = :batch_id",
+            ExpressionAttributeValues={":batch_id": batch_id},
+        )
+        items = response.get("Items", [])
+        files = []
+        for item in items:
+            file = {
+                "file_id": item.get("file_id"),
+                "batch_id": item.get("batch_id"),
+                "file_key": item.get("file_key"),
+                "ttl": item.get("ttl"),
+            }
+            files.append(file)
+        return files
+    except Exception as e:
+        LOGGER.error("Error al obtener los archivos de un batch desde DynamoDB: %s", e)
+        return None
+
+
 def main():
     """Función principal para obtener una respuesta de Claude."""
     LOGGER.info("Iniciando análisis de seguridad")
@@ -836,7 +986,7 @@ def main():
                     TITVO_SCAN_TASK_ID,
                 )
             # Obtener el contenido de los archivos
-            contenido_archivos = get_files_content()
+            files_content = get_files_content()
 
             # Preparar información del repositorio
             repo_info = {
@@ -848,9 +998,7 @@ def main():
             }
 
             # Generar el prompt
-            user_prompt = generate_security_analysis_prompt(
-                repo_info, contenido_archivos
-            )
+            user_prompt = generate_security_analysis_prompt(repo_info, files_content)
 
             # Realizar el análisis
             is_safe, analysis = analyze_code(
@@ -925,7 +1073,7 @@ def main():
                 )
 
             # Obtener el contenido de los archivos
-            contenido_archivos = get_files_content()
+            files_content = get_files_content()
 
             # Preparar información del repositorio
             repo_info = {
@@ -937,9 +1085,7 @@ def main():
             }
 
             # Generar el prompt
-            user_prompt = generate_security_analysis_prompt(
-                repo_info, contenido_archivos
-            )
+            user_prompt = generate_security_analysis_prompt(repo_info, files_content)
 
             # Realizar el análisis
             is_safe, analysis = analyze_code(
@@ -957,6 +1103,7 @@ def main():
                     bitbucket_commit,
                     is_safe,
                     analysis,
+                    item_scan.get("source"),
                 )
                 if report_url is not None:
                     LOGGER.info(
@@ -985,7 +1132,55 @@ def main():
                     "COMPLETED",
                     {},
                 )
-
+        elif item_scan.get("source") == "cli":
+            # Descargar archivos del repositorio
+            if not cli_file_download(item_scan.get("args").get("cli_file_key")):
+                exit_with_error(
+                    "No se pudieron descargar los archivos del repositorio de CLI",
+                    TITVO_SCAN_TASK_ID,
+                )
+            # Obtener el contenido de los archivos
+            file_content = get_files_content()
+            LOGGER.info("Contenido del archivo: %s", file_content)
+            # Generar el prompt
+            user_prompt = generate_security_analysis_prompt(repo_info, file_content)
+            # Realizar el análisis
+            is_safe, analysis = analyze_code(
+                client,
+                system_prompt,
+                user_prompt,
+                TITVO_SCAN_TASK_ID,
+                item_scan.get("source"),
+            )
+            LOGGER.info("Análisis completado")
+            if not is_safe:
+                report_url = generate_and_upload_html_report(
+                    analysis, TITVO_SCAN_TASK_ID, item_scan.get("source")
+                )
+                if report_url is not None:
+                    LOGGER.info("Reporte HTML creado y subido a S3: %s", report_url)
+                    LOGGER.error(
+                        "Revisa el reporte HTML en S3 para más detalles: %s",
+                        report_url,
+                    )
+                    exit_with_error(
+                        "No se pudo crear el reporte de código en CLI",
+                        TITVO_SCAN_TASK_ID,
+                    )
+                else:
+                    update_scan_status(
+                        TITVO_SCAN_TASK_ID,
+                        "FAILED",
+                        {
+                            "report_url": report_url,
+                        },
+                    )
+            else:
+                update_scan_status(
+                    TITVO_SCAN_TASK_ID,
+                    "COMPLETED",
+                    {},
+                )
         else:
             LOGGER.info("No se pudo obtener el source del escaneo")
             exit_with_error(
