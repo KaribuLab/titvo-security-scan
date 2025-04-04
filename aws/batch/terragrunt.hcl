@@ -90,6 +90,16 @@ inputs = {
       {
         "Effect" : "Allow",
         "Action" : [
+          "s3:GetObject"
+        ],
+        "Resource" : [
+          dependency.parameters.outputs.parameters["${local.base_path}/infra/cli-files-bucket-arn"],
+          "${dependency.parameters.outputs.parameters["${local.base_path}/infra/cli-files-bucket-arn"]}/*"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
           "secretsmanager:GetSecretValue"
         ],
         "Resource" : [
