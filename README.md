@@ -1,24 +1,41 @@
-# Analizador de Seguridad para Commits de GitHub
+# Analizador de Seguridad para Commits de SCM
 
-Este proyecto contiene un script que analiza automáticamente commits de GitHub en busca de vulnerabilidades de seguridad utilizando Claude 3.7 Sonnet de Anthropic.
+Este proyecto contiene un conjunto de scripts que analizan automáticamente commits de GitHub, Bitbucket o CLI en busca de vulnerabilidades de seguridad utilizando Claude 3.7 Sonnet de Anthropic.
 
 ## Funcionalidades
 
-- Descarga automática de archivos de un commit específico de GitHub
+- Descarga automática de archivos de commits específicos desde:
+  - GitHub
+  - Bitbucket
+  - CLI (mediante archivos tar.gz en S3)
 - Análisis de seguridad del código utilizando Claude 3.7 Sonnet
 - Creación automática de issues en GitHub con los resultados del análisis
+- Generación de reportes de código en Bitbucket con las vulnerabilidades encontradas
 - Detección de patrones específicos para aprobar o rechazar commits
-- Asignación automática de issues a un usuario específico
 - Seguimiento del estado de los escaneos en DynamoDB
-- Obtención de configuración desde AWS Parameter Store
+- Obtención de configuración desde AWS Parameter Store y Secret Manager
 - System prompt configurable a través de Parameter Store
+
+## Organización del Código
+
+El proyecto está organizado de forma modular:
+
+- `main.py`: Coordina el flujo de trabajo general y delega en los módulos específicos
+- `github_handler.py`: Contiene toda la lógica para interactuar con GitHub
+- `bitbucket_handler.py`: Contiene toda la lógica para interactuar con Bitbucket
+- `cli_handler.py`: Maneja las operaciones relacionadas con escaneos desde CLI
+- `utils.py`: Proporciona funciones comunes como análisis de código y generación de prompts
+- `aws_utils.py`: Contiene toda la lógica de interacción con servicios AWS
 
 ## Requisitos
 
 - Python 3.8 o superior
 - Una clave API de Anthropic
-- Un token de GitHub con permisos para crear issues
-- Acceso al repositorio que se desea analizar
+- Acceso a AWS (DynamoDB, Parameter Store y Secret Manager)
+- Dependiendo del origen:
+  - Un token de GitHub con permisos para crear issues
+  - Credenciales de Bitbucket para crear reportes de código
+  - Acceso a S3 para archivos CLI
 
 ## Instalación
 
@@ -36,24 +53,17 @@ pip install -r requirements.txt
 3. Configura las variables de entorno:
    - Crea un archivo `.env` con las siguientes variables:
    ```
-   ANTHROPIC_API_KEY=tu_clave_api_de_anthropic
-   GITHUB_TOKEN=tu_token_de_github
-   GITHUB_REPO_NAME=usuario/nombre-repositorio
-   GITHUB_COMMIT_SHA=hash_del_commit
-   GITHUB_ASSIGNEE=usuario_para_asignar_issues
    TITVO_SCAN_TASK_ID=identificador_unico_del_escaneo
+   AWS_STAGE=prod  # o 'dev' para entorno de desarrollo
    ```
-
-> [!IMPORTANT]
-> GITHUB_ASSIGNEE debe ser un usuario de GitHub válido. Se debe obtener con el API de GitHub [https://stackoverflow.com/questions/74252630/get-the-login-of-a-user-that-issued-a-comment-on-github-actions](https://stackoverflow.com/questions/74252630/get-the-login-of-a-user-that-issued-a-comment-on-github-actions).
 
 ## Uso del script
 
-El script `main.py` analiza un commit específico de GitHub y crea un issue con los resultados.
+El script `main.py` analiza un commit específico de GitHub, Bitbucket o CLI y gestiona los resultados según el origen.
 
 ### Cómo usar el script
 
-1. Configura las variables de entorno en el archivo `.env` como se indicó anteriormente
+1. Configura las variables de entorno en el archivo `.env`
 2. Ejecuta el script:
 ```bash
 python main.py
@@ -61,66 +71,76 @@ python main.py
 
 El script realizará las siguientes acciones:
 1. Obtendrá el item de escaneo desde DynamoDB y actualizará su estado a `IN_PROGRESS`
-2. Descargará los archivos del commit especificado
-3. Enviará el código a Claude para su análisis
-4. Si se detectan vulnerabilidades:
-   - Creará un issue en GitHub con los resultados
-   - Asignará el issue al usuario especificado en `GITHUB_ASSIGNEE`
-   - Actualizará el estado a `FAILED` y guardará la URL del issue en DynamoDB
-5. Si no se detectan vulnerabilidades:
-   - Actualizará el estado a `COMPLETED` en DynamoDB
-6. Si ocurre algún error durante el proceso:
-   - Actualizará el estado a `ERROR` en DynamoDB
-   - Terminará con código de salida 1
+2. Detectará la fuente del escaneo (GitHub, Bitbucket o CLI)
+3. Descargará los archivos según el origen:
+   - En GitHub: Desde el commit especificado
+   - En Bitbucket: A partir del diff del commit
+   - En CLI: Desde archivos tar.gz en S3
+4. Enviará el código a Claude para su análisis
+5. Según el origen y el resultado:
+   - GitHub: Creará un issue si hay vulnerabilidades
+   - Bitbucket: Generará un reporte de código insights con las vulnerabilidades
+   - CLI: Generará un reporte HTML y lo subirá a S3
+6. Actualizará el estado en DynamoDB según el resultado
 
-### Variables de entorno
+### Integración con AWS
 
-- `ANTHROPIC_API_KEY`: Tu clave API de Anthropic
-- `GITHUB_TOKEN`: Token de acceso personal de GitHub con permisos para crear issues
-- `GITHUB_REPO_NAME`: Nombre del repositorio en formato "usuario/repositorio"
-- `GITHUB_COMMIT_SHA`: Hash del commit que se desea analizar
-- `GITHUB_ASSIGNEE`: Usuario de GitHub al que se asignarán los issues
-- `TITVO_SCAN_TASK_ID`: Identificador único para el trabajo de escaneo actual
-- `AWS_REGION`: Región de AWS donde se encuentra la tabla DynamoDB y Parameter Store
+#### DynamoDB
 
-### Integración con DynamoDB
+El script utiliza DynamoDB para almacenar y actualizar el estado de los escaneos:
 
-El script utiliza una tabla DynamoDB existente para almacenar y actualizar el estado de los escaneos:
+- Tabla principal: Almacena los trabajos de escaneo y sus estados
+- Tabla de archivos CLI: Almacena metadatos de archivos enviados desde CLI
 
-1. Al iniciar el análisis, se obtiene el item correspondiente al `TITVO_SCAN_TASK_ID` desde DynamoDB
-2. Se actualiza el estado a `IN_PROGRESS` y el campo `updated_at` a la fecha actual
-3. Se actualiza el estado final según el resultado del análisis:
-   - `COMPLETED`: Si no se detectan vulnerabilidades significativas (se elimina el campo `issue_url` si existía)
-   - `FAILED`: Si se detectan vulnerabilidades (en este caso también se crea un issue en GitHub y se guarda su URL)
-   - `ERROR`: Si ocurre algún error durante el proceso
-4. En todos los casos se actualiza el campo `updated_at` con la fecha actual
+#### Parameter Store
 
-El nombre de la tabla de DynamoDB se obtiene desde AWS Parameter Store con la clave `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`.
+El script obtiene configuración dinámica desde Parameter Store:
 
-### Integración con Parameter Store
+- System prompt para Claude
+- Formatos de salida específicos para cada origen
+- Nombres de tablas DynamoDB
+- Nombres y dominios de buckets S3
 
-El script utiliza AWS Parameter Store para obtener configuración dinámica:
+#### Secret Manager
 
-1. El nombre de la tabla DynamoDB se obtiene desde el parámetro `/tvo/security-scan/prod/task-trigger/dynamo-task-table-name`
-2. El system prompt para Claude se obtiene desde el parámetro `/tvo/security-scan/prod/github-security-scan/system-prompt` (OBLIGATORIO)
+Se utilizan secretos de AWS Secret Manager para:
 
-Esto permite modificar el comportamiento del analizador sin necesidad de cambiar el código, facilitando:
-- Ajustes en las instrucciones para Claude
-- Cambios en el formato de respuesta esperado
-- Actualización de criterios de análisis de seguridad
+- Credenciales de Bitbucket
+- Claves de cifrado para tokens
 
-> [!IMPORTANT]
-> El parámetro del system prompt es obligatorio para el funcionamiento del script. Si no se puede obtener, el script fallará con un error.
+#### S3
 
-### Personalización
+Se utiliza S3 para:
+
+- Almacenar los archivos enviados desde CLI
+- Guardar los reportes HTML generados
+
+## Personalización
 
 El script utiliza dos prompts principales:
 
 - `system_prompt`: Define las instrucciones y comportamiento para Claude (obtenido desde Parameter Store)
-- `user_prompt`: Define la consulta específica que se envía a Claude con el código a analizar
+- `user_prompt`: Define la consulta específica con el código a analizar
+
+Ambos prompts pueden personalizarse a través de Parameter Store.
 
 ## Formato de respuesta
 
-El análisis de Claude siempre comenzará con uno de estos patrones:
-- `[COMMIT_RECHAZADO]` - Si se encuentran vulnerabilidades de severidad media, alta o crítica
-- `[COMMIT_APROBADO]` - Si no se encuentran vulnerabilidades o solo se encuentran de severidad baja
+El análisis de seguridad se procesa según el origen:
+
+- GitHub: Se busca el patrón `[COMMIT_RECHAZADO]` para determinar si hay vulnerabilidades críticas
+- Bitbucket y CLI: Se buscan los patrones `CRITICAL` o `HIGH` en el análisis
+
+## Configuración avanzada
+
+El proyecto permite una gran flexibilidad a través de la configuración en Parameter Store:
+
+- `/tvo/security-scan/{stage}/github-security-scan/system-prompt`: Instrucciones para Claude
+- `/tvo/security-scan/{stage}/github-security-scan/output/{source}`: Formato de salida esperado según origen
+- `/tvo/security-scan/{stage}/task-trigger/dynamo-task-table-name`: Nombre de la tabla principal
+- `/tvo/security-scan/{stage}/github-security-scan/dynamo-client-file-table-name`: Nombre de la tabla de archivos CLI
+- `/tvo/security-scan/{stage}/github-security-scan/s3-client-file-bucket-name`: Bucket para archivos CLI
+- `/tvo/security-scan/{stage}/github-security-scan/report-bucket-name`: Bucket para reportes
+- `/tvo/security-scan/{stage}/github-security-scan/report-bucket-domain`: Dominio para acceder a los reportes
+
+Donde `{stage}` puede ser `prod` o `dev`, según el entorno.
