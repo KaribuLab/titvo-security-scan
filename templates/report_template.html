@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <title>Reporte de Análisis de Seguridad Titvo</title>
-    <link href="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048231170ce0ffdf1650015_fav-icon.png" rel="shortcut icon" type="image/x-icon">
+    <link href="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048231170ce0ffdf1650015_fav-icon.png"
+        rel="shortcut icon" type="image/x-icon">
     <style>
         :root {
             --titvo-primary: #1a73e8;
@@ -31,7 +33,7 @@
             padding: 30px;
             border-radius: 8px;
             margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .header h1 {
@@ -51,7 +53,7 @@
             padding: 20px;
             margin-bottom: 20px;
             border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s ease;
         }
 
@@ -59,17 +61,28 @@
             transform: translateY(-2px);
         }
 
-        .critical { border-left: 5px solid var(--titvo-danger); }
-        .high { border-left: 5px solid var(--titvo-warning); }
-        .medium { border-left: 5px solid var(--titvo-secondary); }
-        .low { border-left: 5px solid var(--titvo-success); }
+        .critical {
+            border-left: 5px solid var(--titvo-danger);
+        }
+
+        .high {
+            border-left: 5px solid var(--titvo-warning);
+        }
+
+        .medium {
+            border-left: 5px solid var(--titvo-secondary);
+        }
+
+        .low {
+            border-left: 5px solid var(--titvo-success);
+        }
 
         .summary {
             background-color: var(--titvo-light);
             padding: 25px;
             border-radius: 8px;
             margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .summary h2 {
@@ -121,20 +134,41 @@
             margin: 5px 0;
         }
 
-        .severity-critical { background-color: #fce8e6; color: var(--titvo-danger); }
-        .severity-high { background-color: #fef7e0; color: var(--titvo-warning); }
-        .severity-medium { background-color: #e8f0fe; color: var(--titvo-secondary); }
-        .severity-low { background-color: #e6f4ea; color: var(--titvo-success); }
+        .severity-critical {
+            background-color: #fce8e6;
+            color: var(--titvo-danger);
+        }
+
+        .severity-high {
+            background-color: #fef7e0;
+            color: var(--titvo-warning);
+        }
+
+        .severity-medium {
+            background-color: #e8f0fe;
+            color: var(--titvo-secondary);
+        }
+
+        .severity-low {
+            background-color: #e6f4ea;
+            color: var(--titvo-success);
+        }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>
-            <img src="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048081cbb0b106db5539f7e_Titvologo.png" alt="Logo Titvo">
+            <img src="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048081cbb0b106db5539f7e_Titvologo.png"
+                alt="Logo Titvo">
         </h1>
         <h1>Reporte de Análisis de Seguridad</h1>
+        {% if workspace and repo_slug %}
         <p>Repositorio: {{ workspace }}/{{ repo_slug }}</p>
+        {% endif %}
+        {% if commit_sha %}
         <p>Commit: {{ commit_sha }}</p>
+        {% endif %}
         <p>Fecha de Análisis: {{ scan_date }}</p>
     </div>
 
@@ -153,15 +187,15 @@
         <h3>{{ issue.title }}</h3>
         <div class="severity-badge severity-{{ issue.severity.lower() }}">
             {% if issue.severity == 'CRITICAL' %}
-                Crítico
+            Crítico
             {% elif issue.severity == 'HIGH' %}
-                Alto
+            Alto
             {% elif issue.severity == 'MEDIUM' %}
-                Medio
+            Medio
             {% elif issue.severity == 'LOW' %}
-                Bajo
+            Bajo
             {% else %}
-                {{ issue.severity }}
+            {{ issue.severity }}
             {% endif %}
         </div>
         <p><strong>Archivo:</strong> {{ issue.path }}</p>
@@ -179,4 +213,5 @@
     </div>
     {% endfor %}
 </body>
-</html> 
+
+</html>

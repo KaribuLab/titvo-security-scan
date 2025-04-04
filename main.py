@@ -378,14 +378,27 @@ def generate_security_analysis_prompt(repo_info: dict, files_content: str) -> st
     repo_identifier = ""
     if repo_info.get("source") == "github":
         repo_identifier = repo_info.get("repo_name")
-    elif repo_info.get("source") == "bitbucket":
-        repo_identifier = f"{repo_info.get('workspace')}/{repo_info.get('repo_slug')}"
-
-    return f"""
+        return f"""
     A continuación te proporciono el código fuente de un commit específico 
     del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
     Código fuente a analizar:{files_content}
     """
+    elif repo_info.get("source") == "bitbucket":
+        repo_identifier = f"{repo_info.get('workspace')}/{repo_info.get('repo_slug')}"
+        return f"""
+    A continuación te proporciono el código fuente de un commit específico 
+    del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
+    Código fuente a analizar:{files_content}
+    """
+    elif repo_info.get("source") == "cli":
+        repo_identifier = None
+        return f"""
+    A continuación te proporciono el código fuente de un commit específico.
+    Código fuente a analizar:{files_content}
+    """
+    else:
+        LOGGER.error("Fuente de repositorio no válida: %s", repo_info.get("source"))
+        return None
 
 
 def analyze_code(
@@ -417,7 +430,7 @@ def analyze_code(
         LOGGER.info("Análisis de seguridad recibido")
 
         # Mostrar la respuesta
-        LOGGER.info("Respuesta :\n%s", analysis)
+        LOGGER.debug("Respuesta :\n%s", analysis)
 
         # Verificar si el commit es seguro
         if not is_commit_safe(analysis, source):
@@ -1006,6 +1019,12 @@ def main():
             # Generar el prompt
             user_prompt = generate_security_analysis_prompt(repo_info, files_content)
 
+            if not user_prompt:
+                exit_with_error(
+                    "No se pudo generar el prompt para el análisis de seguridad",
+                    TITVO_SCAN_TASK_ID,
+                )
+
             # Realizar el análisis
             is_safe, analysis = analyze_code(
                 client,
@@ -1093,6 +1112,12 @@ def main():
             # Generar el prompt
             user_prompt = generate_security_analysis_prompt(repo_info, files_content)
 
+            if not user_prompt:
+                exit_with_error(
+                    "No se pudo generar el prompt para el análisis de seguridad",
+                    TITVO_SCAN_TASK_ID,
+                )
+
             # Realizar el análisis
             is_safe, analysis = analyze_code(
                 client,
@@ -1155,8 +1180,16 @@ def main():
             # Obtener el contenido de los archivos
             file_content = get_files_content()
             LOGGER.info("Contenido del archivo: %s", file_content)
+            repo_info = {
+                "source": "cli",
+            }
             # Generar el prompt
             user_prompt = generate_security_analysis_prompt(repo_info, file_content)
+            if not user_prompt:
+                exit_with_error(
+                    "No se pudo generar el prompt para el análisis de seguridad",
+                    TITVO_SCAN_TASK_ID,
+                )
             # Realizar el análisis
             is_safe, analysis = analyze_code(
                 client,
