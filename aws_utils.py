@@ -112,6 +112,7 @@ def get_scan_item(scan_id):
             return {
                 "args": item["args"],
                 "source": item["source"],
+                "repositor_id": item["repositor_id"],
             }
         else:
             LOGGER.error("No se encontró el item con scan_id: %s", scan_id)
@@ -226,3 +227,19 @@ def upload_html_to_s3(html_content, scan_id, source):
     except Exception as e:
         LOGGER.error("Error al subir el reporte HTML a S3: %s", e)
         return None
+
+
+def get_repository_table_name():
+    """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/github-security-scan/dynamo-repository-table-name"
+
+    return get_ssm_parameter(param_name)
+
+
+def get_hint_item(repositor_id):
+    """Obtiene el hint de la tabla DynamoDB."""
+    table_name = get_repository_table_name()
+    table = boto3.resource("dynamodb").Table(table_name)
+    response = table.get_item(Key={"repositor_id": repositor_id})
+    return response.get("Item", {"repository_hint": None}).get("repository_hint", None)
