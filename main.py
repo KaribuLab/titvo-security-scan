@@ -55,22 +55,18 @@ def main():
             "No se pudo actualizar el estado del escaneo a IN_PROGRESS",
             TITVO_SCAN_TASK_ID,
         )
+    hint = None
+    if item_scan.get("repository_id") is not None:
+        hint = aws_utils.get_hint_item(item_scan.get("repository_id"))
 
     # Obtener el system prompt desde Parameter Store
-    base_prompt = aws_utils.get_base_prompt()
+    base_prompt = aws_utils.get_base_prompt(hint)
     if not base_prompt:
         utils.exit_with_error(
             "No se pudo obtener el base prompt desde Parameter Store. "
             "Este parámetro es obligatorio.",
             TITVO_SCAN_TASK_ID,
         )
-    if item_scan.get("repositor_id") is not None:
-        hint = aws_utils.get_hint_item(item_scan.get("repositor_id"))
-        if hint is not None:
-            base_prompt = (
-                f"{base_prompt}\n\nUtiliza este consejo para tu análisis: {hint}"
-            )
-            LOGGER.info("Consejo obtenido correctamente")
 
     output_format = aws_utils.get_output_format(item_scan.get("source"))
     if not output_format:
