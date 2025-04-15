@@ -117,6 +117,8 @@ def analyze_code(
         tuple[bool, str]: Una tupla con (True si el commit es seguro, el análisis de seguridad)
     """
     try:
+        LOGGER.info("System prompt: %s", system_prompt)
+        LOGGER.info("User prompt: %s", user_prompt)
         # Enviar la solicitud a Claude
         respuesta = client.messages.create(
             model=MODEL,
