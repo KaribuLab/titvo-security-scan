@@ -241,9 +241,9 @@ def get_repository_table_name():
     return get_ssm_parameter(param_name)
 
 
-def get_hint_item(repositor_id):
+def get_hint_item(repository_id):
     """Obtiene el hint de la tabla DynamoDB."""
     table_name = get_repository_table_name()
     table = boto3.resource("dynamodb").Table(table_name)
-    response = table.get_item(Key={"repositor_id": repositor_id})
+    response = table.get_item(Key={"repository_id": repository_id})
     return response.get("Item", {"repository_hint": None}).get("repository_hint", None)
