@@ -3,7 +3,6 @@ FROM python:3.12.8-alpine3.21
 WORKDIR /app
 
 # Copiar archivos del proyecto
-COPY ./ /app
 COPY requirements.txt /app
 
 # Crear usuario no privilegiado para seguridad
@@ -14,6 +13,8 @@ RUN chown -R titvo:titvo /app
 
 # Instalar dependencias
 RUN pip install -r requirements.txt
+
+COPY ./ /app
 
 # Cambiar al usuario no privilegiado
 USER titvo
