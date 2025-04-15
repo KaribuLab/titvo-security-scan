@@ -59,7 +59,7 @@ def get_anthropic_api_key():
     return get_ssm_parameter(param_name)
 
 
-def get_base_prompt():
+def get_base_prompt(hint):
     """Obtiene el system prompt desde Parameter Store."""
     param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
     param_name = f"{param_path}/github-security-scan/system-prompt"
@@ -70,6 +70,10 @@ def get_base_prompt():
         LOGGER.error("No se pudo obtener el system prompt desde Parameter Store")
         LOGGER.error("Este parámetro es obligatorio para el funcionamiento del script")
         return None
+
+    if hint:
+        system_prompt = f"{system_prompt}\n\nUtiliza estos consejos para tu análisis:\n{hint}"
+        LOGGER.info("Consejos obtenidos correctamente")
 
     return system_prompt
 
@@ -112,7 +116,7 @@ def get_scan_item(scan_id):
             return {
                 "args": item["args"],
                 "source": item["source"],
-                "repositor_id": item.get("repositor_id", None),
+                "repository_id": item.get("repository_id", None),
             }
         else:
             LOGGER.error("No se encontró el item con scan_id: %s", scan_id)
