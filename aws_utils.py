@@ -112,7 +112,7 @@ def get_scan_item(scan_id):
             return {
                 "args": item["args"],
                 "source": item["source"],
-                "repositor_id": item["repositor_id"],
+                "repositor_id": item.get("repositor_id", None),
             }
         else:
             LOGGER.error("No se encontró el item con scan_id: %s", scan_id)

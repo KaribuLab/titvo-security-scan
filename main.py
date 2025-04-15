@@ -64,10 +64,13 @@ def main():
             "Este parámetro es obligatorio.",
             TITVO_SCAN_TASK_ID,
         )
-    hint = aws_utils.get_hint_item(item_scan.get("repositor_id"))
-    if hint is not None:
-        base_prompt = f"{base_prompt}\n\nUtiliza este consejo para tu análisis: {hint}"
-        LOGGER.info("Consejo obtenido correctamente")
+    if item_scan.get("repositor_id") is not None:
+        hint = aws_utils.get_hint_item(item_scan.get("repositor_id"))
+        if hint is not None:
+            base_prompt = (
+                f"{base_prompt}\n\nUtiliza este consejo para tu análisis: {hint}"
+            )
+            LOGGER.info("Consejo obtenido correctamente")
 
     output_format = aws_utils.get_output_format(item_scan.get("source"))
     if not output_format:
