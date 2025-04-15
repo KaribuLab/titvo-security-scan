@@ -90,7 +90,8 @@ inputs = {
       {
         "Effect" : "Allow",
         "Action" : [
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:ListBucket"
         ],
         "Resource" : [
           dependency.parameters.outputs.parameters["${local.base_path}/infra/cli-files-bucket-arn"],
