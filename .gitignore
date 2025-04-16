@@ -23,3 +23,5 @@ build/
 
 # Archivos de descarga
 repo_files/
+
+*.log
