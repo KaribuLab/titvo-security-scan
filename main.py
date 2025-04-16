@@ -60,7 +60,7 @@ def main():
         hint = aws_utils.get_hint_item(item_scan.get("repository_id"))
 
     # Obtener el system prompt desde Parameter Store
-    base_prompt = aws_utils.get_base_prompt(hint)
+    base_prompt = aws_utils.get_base_prompt(utils.MODEL, hint)
     if not base_prompt:
         utils.exit_with_error(
             "No se pudo obtener el base prompt desde Parameter Store. "

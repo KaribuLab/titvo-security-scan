@@ -59,12 +59,29 @@ def get_anthropic_api_key():
     return get_ssm_parameter(param_name)
 
 
-def get_base_prompt(hint):
-    """Obtiene el system prompt desde Parameter Store."""
+def get_system_prompt_table_name():
+    """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
     param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
-    param_name = f"{param_path}/github-security-scan/system-prompt"
+    param_name = f"{param_path}/github-security-scan/dynamo-system-prompt-table-name"
 
-    system_prompt = get_ssm_parameter(param_name)
+    return get_ssm_parameter(param_name)
+
+def get_system_prompt_item(prompt_id):
+    """Obtiene el item de system prompt desde Parameter Store."""
+    table_name = get_system_prompt_table_name()
+    table = boto3.resource("dynamodb").Table(table_name)
+    response = table.get_item(Key={"prompt_id": prompt_id})
+    return response.get("Item", {"system_prompt": None})
+
+def get_base_prompt(model, hint):
+    """Obtiene el system prompt desde Parameter Store."""
+    system_prompt_item = get_system_prompt_item(model)
+
+    if not system_prompt_item:
+        LOGGER.error("No se pudo obtener el system prompt desde Parameter Store")
+        return None
+
+    system_prompt = system_prompt_item.get("system_prompt", None)
 
     if not system_prompt:
         LOGGER.error("No se pudo obtener el system prompt desde Parameter Store")

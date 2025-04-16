@@ -34,6 +34,7 @@ dependency parameters {
       "/tvo/security-scan/prod/infra/secret-manager-arn"          = "arn:aws:secretsmanager:us-east-1:000000000000:secret:/tvo/security-scan/prod",
       "/tvo/security-scan/prod/infra/report-bucket-arn"           = "arn:aws:s3:::devsecops-titvo-com-report-bucket"
       "/tvo/security-scan/prod/infra/dynamo-cli-files-table-arn"  = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-cli-files-table-prod"
+      "/tvo/security-scan/prod/infra/dynamo-prompt-table-arn"     = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-prompt-table-prod"
     }
   }
 }
@@ -86,6 +87,7 @@ inputs = {
         ],
         "Resource" : [
           dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-repository-table-arn"],
+          dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-prompt-table-arn"]
         ]
       },
       {
