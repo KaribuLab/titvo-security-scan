@@ -93,8 +93,8 @@ def get_base_prompt(model, hint):
     if hint:
         system_prompt = (
             f"{system_prompt}\n\n",
-            "**Pon MUCHA ANTENCIÓN a los consejos que ",
-            f"te da el jefe de seguridad a continuación:**\n{hint}",
+            "## Pon MUCHA ANTENCIÓN a los consejos que ",
+            f"te da el jefe de seguridad a continuación!!\n{hint}",
         )
         LOGGER.info("Consejos obtenidos correctamente")
 
