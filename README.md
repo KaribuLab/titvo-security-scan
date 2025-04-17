@@ -15,6 +15,7 @@ Este proyecto contiene un conjunto de scripts que analizan automáticamente comm
 - Seguimiento del estado de los escaneos en DynamoDB
 - Obtención de configuración desde AWS Parameter Store y Secret Manager
 - System prompt configurable a través de Parameter Store
+- Nivel de logging configurable mediante variable de entorno
 
 ## Organización del Código
 
@@ -55,6 +56,7 @@ pip install -r requirements.txt
    ```
    TITVO_SCAN_TASK_ID=identificador_unico_del_escaneo
    AWS_STAGE=prod  # o 'dev' para entorno de desarrollo
+   LOG_LEVEL=INFO  # opciones: DEBUG, INFO, WARNING, ERROR, CRITICAL
    ```
 
 ## Uso del script
@@ -82,6 +84,20 @@ El script realizará las siguientes acciones:
    - Bitbucket: Generará un reporte de código insights con las vulnerabilidades
    - CLI: Generará un reporte HTML y lo subirá a S3
 6. Actualizará el estado en DynamoDB según el resultado
+
+### Configuración de logging
+
+El nivel de log se puede ajustar mediante la variable de entorno `LOG_LEVEL`:
+- `DEBUG`: Muestra todos los mensajes, incluyendo información detallada útil para depuración.
+- `INFO`: Muestra mensajes informativos, de advertencia y errores (valor predeterminado).
+- `WARNING`: Solo muestra advertencias y errores.
+- `ERROR`: Solo muestra mensajes de error.
+- `CRITICAL`: Solo muestra errores críticos.
+
+Ejemplo:
+```bash
+LOG_LEVEL=DEBUG python main.py
+```
 
 ### Integración con AWS
 
@@ -155,7 +171,7 @@ AWS_REGION=us-east-1
 AWS_DEFAULT_REGION=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
-#LOG_LEVEL=DEBUG
+LOG_LEVEL=INFO # Opcional, por defecto es INFO
 ```
 
 ```bash
