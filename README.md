@@ -144,3 +144,21 @@ El proyecto permite una gran flexibilidad a través de la configuración en Para
 - `/tvo/security-scan/{stage}/github-security-scan/report-bucket-domain`: Dominio para acceder a los reportes
 
 Donde `{stage}` puede ser `prod` o `dev`, según el entorno.
+
+## Ejecución local usando Docker
+
+Crea un archivo `.env` con las variables de entorno necesarias:
+
+```bash
+TITVO_SCAN_TASK_ID=tvo-scan-1234567890 # Necesario para obtener el item de escaneo desde DynamoDB
+AWS_REGION=us-east-1
+AWS_DEFAULT_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+#LOG_LEVEL=DEBUG
+```
+
+```bash
+docker build -t deleteme .
+docker run -it --rm --env-file .env deleteme
+```
