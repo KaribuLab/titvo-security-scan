@@ -297,11 +297,23 @@ def create_code_insights_report(
         LOGGER.exception(e)
         return None
 
+def is_commit_warning(analysis):
+    """Determina si el commit es un warning basado en el análisis de Claude."""
+    json_analysis = json.loads(analysis)
+    status = json_analysis.get("status")
+    if status is not None and status == "WARNING":
+        return True
+    return False
 
 def is_commit_safe(analysis):
     """Determina si el commit es seguro basado en el análisis de Claude."""
     # Si el análisis contiene el patrón de rechazo, el commit no es seguro
-    if "CRITICAL" in analysis or "HIGH" in analysis:
+    json_analysis = json.loads(analysis)
+    status = json_analysis.get("status")
+    if status is not None and status == "FAILED":
         return False
-    # Si no se encontró el patrón de rechazo, el commit es seguro
-    return True
+    elif status is None:
+        LOGGER.error("No se pudo determinar el estado del análisis: %s", analysis)
+        return False
+    else:
+        return True

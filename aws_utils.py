@@ -66,12 +66,14 @@ def get_system_prompt_table_name():
 
     return get_ssm_parameter(param_name)
 
+
 def get_system_prompt_item(prompt_id):
     """Obtiene el item de system prompt desde Parameter Store."""
     table_name = get_system_prompt_table_name()
     table = boto3.resource("dynamodb").Table(table_name)
     response = table.get_item(Key={"prompt_id": prompt_id})
     return response.get("Item", {"system_prompt": None})
+
 
 def get_base_prompt(model, hint):
     """Obtiene el system prompt desde Parameter Store."""
@@ -89,7 +91,11 @@ def get_base_prompt(model, hint):
         return None
 
     if hint:
-        system_prompt = f"{system_prompt}\n\nUtiliza estos consejos para tu análisis:\n{hint}"
+        system_prompt = (
+            f"{system_prompt}\n\n",
+            "**Pon MUCHA ANTENCIÓN a los consejos que ",
+            f"te da el jefe de seguridad a continuación:**\n{hint}",
+        )
         LOGGER.info("Consejos obtenidos correctamente")
 
     return system_prompt

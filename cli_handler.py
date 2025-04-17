@@ -1,8 +1,8 @@
 import os
 import tarfile
 import logging
+import json
 import boto3
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -102,11 +102,23 @@ def get_files_by_batch_id(batch_id, get_ssm_parameter):
         LOGGER.exception(e)
         return None
 
+def is_commit_warning(analysis):
+    """Determina si el commit es un warning basado en el análisis de Claude."""
+    json_analysis = json.loads(analysis)
+    status = json_analysis.get("status")
+    if status is not None and status == "WARNING":
+        return True
+    return False
 
 def is_commit_safe(analysis):
-    """Determina si el commit es seguro basado en el análisis de CLI."""
-    # Implementación específica para CLI
-    # En este caso, usamos la misma lógica general
-    if "CRITICAL" in analysis or "HIGH" in analysis:
+    """Determina si el commit es seguro basado en el análisis de Claude."""
+    # Si el análisis contiene el patrón de rechazo, el commit no es seguro
+    json_analysis = json.loads(analysis)
+    status = json_analysis.get("status")
+    if status is not None and status == "FAILED":
         return False
-    return True
+    elif status is None:
+        LOGGER.error("No se pudo determinar el estado del análisis: %s", analysis)
+        return False
+    else:
+        return True

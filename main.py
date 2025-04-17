@@ -142,7 +142,7 @@ def process_github_scan(client, system_prompt, item_scan):
         )
 
     # Realizar el análisis
-    is_safe, analysis = utils.analyze_code(
+    is_safe, is_warning, analysis = utils.analyze_code(
         client,
         system_prompt,
         user_prompt,
@@ -174,10 +174,21 @@ def process_github_scan(client, system_prompt, item_scan):
                 },
             )
     else:
+        result = {}
+        if is_warning:
+            LOGGER.info("Se ha creado un issue con el análisis: %s", issue_url)
+            issue_url = github_handler.create_issue(
+                analysis,
+                github_commit_sha,
+                github_client,
+                github_repo_name,
+                github_assignee,
+            )
+            result["issue_url"] = issue_url
         aws_utils.update_scan_status(
             TITVO_SCAN_TASK_ID,
             "COMPLETED",
-            {},
+            result,
         )
 
 
@@ -241,7 +252,7 @@ def process_bitbucket_scan(client, system_prompt, item_scan):
             )
 
         # Realizar el análisis
-        is_safe, analysis = utils.analyze_code(
+        is_safe, is_warning, analysis = utils.analyze_code(
             client,
             system_prompt,
             user_prompt,
@@ -285,10 +296,24 @@ def process_bitbucket_scan(client, system_prompt, item_scan):
                     TITVO_SCAN_TASK_ID,
                 )
         else:
+            result = {}
+            if is_warning:
+                report_url = bitbucket_handler.create_code_insights_report(
+                    access_token,
+                    bitbucket_workspace,
+                    bitbucket_repo_slug,
+                    bitbucket_commit,
+                    is_safe,
+                    analysis_json,
+                    item_scan.get("source"),
+                    TITVO_SCAN_TASK_ID,
+                    utils.generate_and_upload_html_report,
+                )
+                result["report_url"] = report_url
             aws_utils.update_scan_status(
                 TITVO_SCAN_TASK_ID,
                 "COMPLETED",
-                {},
+                result,
             )
     except Exception as e:
         LOGGER.exception(e)
@@ -339,7 +364,7 @@ def process_cli_scan(client, system_prompt, item_scan):
             )
 
         # Realizar el análisis
-        is_safe, analysis = utils.analyze_code(
+        is_safe, is_warning, analysis = utils.analyze_code(
             client,
             system_prompt,
             user_prompt,
@@ -374,10 +399,16 @@ def process_cli_scan(client, system_prompt, item_scan):
                     TITVO_SCAN_TASK_ID,
                 )
         else:
+            result = {}
+            if is_warning:
+                report_url = utils.generate_and_upload_html_report(
+                    analysis_json, TITVO_SCAN_TASK_ID, item_scan.get("source")
+                )
+                result["report_url"] = report_url
             aws_utils.update_scan_status(
                 TITVO_SCAN_TASK_ID,
                 "COMPLETED",
-                {},
+                result,
             )
     except Exception as e:
         LOGGER.exception(e)

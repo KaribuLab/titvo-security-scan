@@ -3,9 +3,19 @@ import sys
 import logging
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
-from github_handler import is_commit_safe as github_is_safe
-from bitbucket_handler import is_commit_safe as bitbucket_is_safe
-from cli_handler import is_commit_safe as cli_is_safe
+from github_handler import (
+    is_commit_safe as github_is_safe,
+    is_commit_warning as github_is_warning,
+)
+from bitbucket_handler import (
+    is_commit_safe as bitbucket_is_safe,
+    is_commit_warning as bitbucket_is_warning,
+)
+from cli_handler import (
+    is_commit_safe as cli_is_safe,
+    is_commit_warning as cli_is_warning,
+)
+
 # Importar funciones de AWS desde el nuevo módulo
 from aws_utils import (
     update_scan_status,
@@ -103,7 +113,7 @@ def generate_security_analysis_prompt(repo_info: dict, files_content: str) -> st
 
 def analyze_code(
     client, system_prompt: str, user_prompt: str, scan_id: str, source: str
-) -> tuple[bool, str]:
+) -> tuple[bool, bool, str]:
     """Realiza el análisis de seguridad del código.
 
     Args:
@@ -114,7 +124,8 @@ def analyze_code(
         source (str): Fuente del análisis (github, bitbucket, cli)
 
     Returns:
-        tuple[bool, str]: Una tupla con (True si el commit es seguro, el análisis de seguridad)
+        tuple[bool, bool, str]: Una tupla con 
+        (True si el commit es seguro, True si el commit es un warning, el análisis de seguridad)
     """
     try:
         LOGGER.info("System prompt: %s", system_prompt)
@@ -138,19 +149,22 @@ def analyze_code(
         # Importar dinámicamente el módulo correcto basado en la fuente
         if source == "github":
             is_safe = github_is_safe(analysis)
+            is_warning = github_is_warning(analysis)
         elif source == "bitbucket":
             is_safe = bitbucket_is_safe(analysis)
+            is_warning = bitbucket_is_warning(analysis)
         elif source == "cli":
             is_safe = cli_is_safe(analysis)
+            is_warning = cli_is_warning(analysis)
         else:
             LOGGER.error("Fuente no válida: %s", source)
-            return False, analysis
+            return False, False, analysis
 
         if not is_safe:
             LOGGER.error(
                 "¡COMMIT RECHAZADO! Se han detectado vulnerabilidades de seguridad."
             )
-            return False, analysis
+            return False, is_warning, analysis
         else:
             LOGGER.info(
                 "COMMIT APROBADO. No se detectaron vulnerabilidades "
@@ -158,17 +172,17 @@ def analyze_code(
             )
             # Actualizar el estado a COMPLETED
             update_scan_status(scan_id, "COMPLETED")
-            return True, analysis
+            return True, is_warning, analysis
 
     except Exception as e:
         LOGGER.exception(e)
         exit_with_error(e, scan_id)
-        return False, ""
+        return False, False, ""
 
 
 def exit_with_error(message, scan_id=None):
     """Actualiza el estado a ERROR en DynamoDB y termina el script con código 1.
-    
+
     Args:
         message: Puede ser un string o una excepción
         scan_id: ID del escaneo para actualizar su estado
@@ -178,7 +192,7 @@ def exit_with_error(message, scan_id=None):
         LOGGER.exception(message)
     else:
         LOGGER.error(message)
-        
+
     if scan_id:
         update_scan_status(scan_id, "ERROR")
     sys.exit(1)

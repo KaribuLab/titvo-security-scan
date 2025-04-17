@@ -106,6 +106,11 @@ def create_issue(
         LOGGER.exception(e)
         return None
 
+def is_commit_warning(analysis):
+    """Determina si el commit es un warning basado en el análisis de Claude."""
+    if "[COMMIT_CON_OBSERVACIONES]" in analysis:
+        return False
+    return True
 
 def is_commit_safe(analysis):
     """Determina si el commit es seguro basado en el análisis de Claude."""
