@@ -3,6 +3,7 @@ import sys
 import logging
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
+from langchain_core.messages import HumanMessage, SystemMessage
 from github_handler import (
     is_commit_safe as github_is_safe,
     is_commit_warning as github_is_warning,
@@ -23,7 +24,7 @@ from aws_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-MODEL = "claude-3-7-sonnet-latest"
+MODEL = "o4-mini"
 
 
 def validate_environment_variables(scan_task_id):
@@ -75,72 +76,86 @@ def get_files_content():
     return files_content
 
 
-def generate_security_analysis_prompt(repo_info: dict, files_content: str) -> str:
+def generate_security_analysis_prompt(
+    repo_info: dict, files_content: str, hint: str
+) -> str:
     """Genera el prompt para el análisis de seguridad.
 
     Args:
         repo_info (dict): Diccionario con la información del repositorio
         files_content (str): Contenido de los archivos a analizar
+        hint (str): Consejos para el análisis de seguridad
 
     Returns:
         str: El prompt generado
     """
     repo_identifier = ""
+    prompt_hint = ""
+    if hint:
+        # pylint: disable=line-too-long
+        prompt_hint = f"""Soy el jefe de seguridad y te doy los siguientes consejos:
+===========================================
+{hint}
+===========================================
+"""
+    # pylint: enable=line-too-long
     if repo_info.get("source") == "github":
         repo_identifier = repo_info.get("repo_name")
         return f"""
-    A continuación te proporciono el código fuente de un commit específico 
-    del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
-    Código fuente a analizar:{files_content}
-    """
+{prompt_hint}
+A continuación te proporciono el código fuente de un commit específico 
+del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
+Código fuente a analizar:{files_content}
+"""
     elif repo_info.get("source") == "bitbucket":
         repo_identifier = f"{repo_info.get('workspace')}/{repo_info.get('repo_slug')}"
         return f"""
-    A continuación te proporciono el código fuente de un commit específico 
-    del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
-    Código fuente a analizar:{files_content}
-    """
+{prompt_hint}
+A continuación te proporciono el código fuente de un commit específico 
+del repositorio {repo_identifier} (commit: {repo_info.get('commit_sha')}).
+Código fuente a analizar:{files_content}
+"""
     elif repo_info.get("source") == "cli":
         repo_identifier = None
         return f"""
-    A continuación te proporciono el código fuente de un commit específico.
-    Código fuente a analizar:{files_content}
-    """
+{prompt_hint}
+A continuación te proporciono el código fuente de un commit específico.
+Código fuente a analizar:{files_content}
+"""
     else:
         LOGGER.error("Fuente de repositorio no válida: %s", repo_info.get("source"))
         return None
 
 
 def analyze_code(
-    client, system_prompt: str, user_prompt: str, scan_id: str, source: str
+    model, system_prompt: str, user_prompt: str, scan_id: str, source: str
 ) -> tuple[bool, bool, str]:
     """Realiza el análisis de seguridad del código.
 
     Args:
-        client: Cliente de Claude
+        model: Modelo de LangChain
         system_prompt (str): Prompt del sistema
         user_prompt (str): Prompt del usuario
         scan_id (str): ID del escaneo
         source (str): Fuente del análisis (github, bitbucket, cli)
 
     Returns:
-        tuple[bool, bool, str]: Una tupla con 
+        tuple[bool, bool, str]: Una tupla con
         (True si el commit es seguro, True si el commit es un warning, el análisis de seguridad)
     """
     try:
         LOGGER.info("System prompt: %s", system_prompt)
         LOGGER.info("User prompt: %s", user_prompt)
-        # Enviar la solicitud a Claude
-        respuesta = client.messages.create(
-            model=MODEL,
-            temperature=0.7,
-            max_tokens=4000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+
+        output = model.invoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
         )
 
-        # Obtener el análisis de Claude
-        analysis = respuesta.content[0].text
+        LOGGER.info("Output: %s", output)
+        analysis = output.content
         LOGGER.info("Análisis de seguridad recibido")
 
         # Mostrar la respuesta

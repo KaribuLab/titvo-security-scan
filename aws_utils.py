@@ -58,6 +58,13 @@ def get_anthropic_api_key():
 
     return get_ssm_parameter(param_name)
 
+def get_openai_api_key():
+    """Obtiene la clave de API de OpenAI desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/task-trigger/openai-api-key"
+
+    return get_ssm_parameter(param_name)
+
 
 def get_system_prompt_table_name():
     """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
@@ -75,7 +82,7 @@ def get_system_prompt_item(prompt_id):
     return response.get("Item", {"system_prompt": None})
 
 
-def get_base_prompt(model, hint):
+def get_base_prompt(model):
     """Obtiene el system prompt desde Parameter Store."""
     system_prompt_item = get_system_prompt_item(model)
 
@@ -89,14 +96,6 @@ def get_base_prompt(model, hint):
         LOGGER.error("No se pudo obtener el system prompt desde Parameter Store")
         LOGGER.error("Este parámetro es obligatorio para el funcionamiento del script")
         return None
-
-    if hint:
-        system_prompt = (
-            f"{system_prompt}\n\n",
-            "## Pon MUCHA ANTENCIÓN a los consejos que ",
-            f"te da el jefe de seguridad a continuación!!\n{hint}",
-        )
-        LOGGER.info("Consejos obtenidos correctamente")
 
     return system_prompt
 

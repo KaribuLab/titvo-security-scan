@@ -2,7 +2,7 @@ import os
 import logging
 import json
 from dotenv import load_dotenv
-from anthropic import Anthropic
+from langchain.chat_models import init_chat_model
 
 # Importar los módulos refactorizados
 import github_handler
@@ -60,7 +60,7 @@ def main():
         hint = aws_utils.get_hint_item(item_scan.get("repository_id"))
 
     # Obtener el system prompt desde Parameter Store
-    base_prompt = aws_utils.get_base_prompt(utils.MODEL, hint)
+    base_prompt = aws_utils.get_base_prompt(utils.MODEL)
     if not base_prompt:
         utils.exit_with_error(
             "No se pudo obtener el base prompt desde Parameter Store. "
@@ -79,17 +79,19 @@ def main():
 
     system_prompt = f"{base_prompt}\n\n{output_format}"
 
-    # Inicializar el cliente de Anthropic
-    client = Anthropic(api_key=aws_utils.get_anthropic_api_key())
+    model = init_chat_model(
+        utils.MODEL, model_provider="openai", api_key=aws_utils.get_openai_api_key()
+    )
+
     LOGGER.info("Enviando código para análisis")
 
     try:
         if item_scan.get("source") == "github":
-            process_github_scan(client, system_prompt, item_scan)
+            process_github_scan(model, system_prompt, hint, item_scan)
         elif item_scan.get("source") == "bitbucket":
-            process_bitbucket_scan(client, system_prompt, item_scan)
+            process_bitbucket_scan(model, system_prompt, hint, item_scan)
         elif item_scan.get("source") == "cli":
-            process_cli_scan(client, system_prompt, item_scan)
+            process_cli_scan(model, system_prompt, hint, item_scan)
         else:
             LOGGER.info("No se pudo obtener el source del escaneo")
             utils.exit_with_error(
@@ -101,7 +103,7 @@ def main():
         utils.exit_with_error(e, TITVO_SCAN_TASK_ID)
 
 
-def process_github_scan(client, system_prompt, item_scan):
+def process_github_scan(model, system_prompt, hint, item_scan):
     """Procesa un escaneo de GitHub."""
     # Inicializar el cliente de GitHub
     github_client = github_handler.Github(
@@ -133,7 +135,9 @@ def process_github_scan(client, system_prompt, item_scan):
     }
 
     # Generar el prompt
-    user_prompt = utils.generate_security_analysis_prompt(repo_info, files_content)
+    user_prompt = utils.generate_security_analysis_prompt(
+        repo_info, files_content, hint
+    )
 
     if not user_prompt:
         utils.exit_with_error(
@@ -143,7 +147,7 @@ def process_github_scan(client, system_prompt, item_scan):
 
     # Realizar el análisis
     is_safe, is_warning, analysis = utils.analyze_code(
-        client,
+        model,
         system_prompt,
         user_prompt,
         TITVO_SCAN_TASK_ID,
@@ -192,7 +196,7 @@ def process_github_scan(client, system_prompt, item_scan):
         )
 
 
-def process_bitbucket_scan(client, system_prompt, item_scan):
+def process_bitbucket_scan(model, system_prompt, hint, item_scan):
     """Procesa un escaneo de Bitbucket."""
     try:
         # Obtener parámetros de Bitbucket
@@ -243,7 +247,9 @@ def process_bitbucket_scan(client, system_prompt, item_scan):
         }
 
         # Generar el prompt
-        user_prompt = utils.generate_security_analysis_prompt(repo_info, files_content)
+        user_prompt = utils.generate_security_analysis_prompt(
+            repo_info, files_content, hint
+        )
 
         if not user_prompt:
             utils.exit_with_error(
@@ -253,7 +259,7 @@ def process_bitbucket_scan(client, system_prompt, item_scan):
 
         # Realizar el análisis
         is_safe, is_warning, analysis = utils.analyze_code(
-            client,
+            model,
             system_prompt,
             user_prompt,
             TITVO_SCAN_TASK_ID,
@@ -320,7 +326,7 @@ def process_bitbucket_scan(client, system_prompt, item_scan):
         utils.exit_with_error(e, TITVO_SCAN_TASK_ID)
 
 
-def process_cli_scan(client, system_prompt, item_scan):
+def process_cli_scan(model, system_prompt, hint, item_scan):
     """Procesa un escaneo de CLI."""
     try:
         batch_id = item_scan.get("args").get("batch_id", "").replace('"', "")
@@ -355,7 +361,9 @@ def process_cli_scan(client, system_prompt, item_scan):
         }
 
         # Generar el prompt
-        user_prompt = utils.generate_security_analysis_prompt(repo_info, file_content)
+        user_prompt = utils.generate_security_analysis_prompt(
+            repo_info, file_content, hint
+        )
 
         if not user_prompt:
             utils.exit_with_error(
@@ -365,7 +373,7 @@ def process_cli_scan(client, system_prompt, item_scan):
 
         # Realizar el análisis
         is_safe, is_warning, analysis = utils.analyze_code(
-            client,
+            model,
             system_prompt,
             user_prompt,
             TITVO_SCAN_TASK_ID,
