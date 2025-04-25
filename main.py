@@ -80,7 +80,7 @@ def main():
     system_prompt = f"{base_prompt}\n\n{output_format}"
 
     model = init_chat_model(
-        utils.MODEL, model_provider="openai", api_key=aws_utils.get_openai_api_key()
+        utils.MODEL, model_provider="anthropic", api_key=aws_utils.get_anthropic_api_key()
     )
 
     LOGGER.info("Enviando código para análisis")

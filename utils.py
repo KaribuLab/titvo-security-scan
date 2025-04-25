@@ -24,7 +24,7 @@ from aws_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-MODEL = "o4-mini"
+MODEL = "claude-3-7-sonnet-latest"
 
 
 def validate_environment_variables(scan_task_id):

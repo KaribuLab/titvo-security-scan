@@ -65,6 +65,13 @@ def get_openai_api_key():
 
     return get_ssm_parameter(param_name)
 
+def get_google_genai_api_key():
+    """Obtiene la clave de API de Google GenAI desde Parameter Store."""
+    param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
+    param_name = f"{param_path}/task-trigger/gemini-api-key"
+
+    return get_ssm_parameter(param_name)
+
 
 def get_system_prompt_table_name():
     """Obtiene el nombre de la tabla DynamoDB desde Parameter Store."""
