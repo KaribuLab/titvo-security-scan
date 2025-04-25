@@ -24,7 +24,7 @@ from aws_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-MODEL = "claude-3-7-sonnet-latest"
+MODEL = "o4-mini"
 
 
 def validate_environment_variables(scan_task_id):
@@ -39,14 +39,16 @@ def validate_environment_variables(scan_task_id):
     return True
 
 
-def get_files_content():
+def get_files_content() -> tuple[int, str]:
     """Obtiene el contenido de todos los archivos descargados."""
     files_content = ""
+    files_count = 0
     LOGGER.info("Obteniendo contenido de los archivos descargados")
 
     # Recorrer el directorio repo_files
     for root, _, files in os.walk("repo_files"):
         for file in files:
+            files_count += 1
             # Construir la ruta completa del archivo
             ruta_archivo = os.path.join(root, file)
 
@@ -73,7 +75,7 @@ def get_files_content():
                     f"Error al leer el archivo: {str(e)}\n```"
                 )
 
-    return files_content
+    return files_count, files_content
 
 
 def generate_security_analysis_prompt(

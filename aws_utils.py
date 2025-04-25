@@ -58,12 +58,14 @@ def get_anthropic_api_key():
 
     return get_ssm_parameter(param_name)
 
+
 def get_openai_api_key():
     """Obtiene la clave de API de OpenAI desde Parameter Store."""
     param_path = f"/tvo/security-scan/{os.getenv('AWS_STAGE','prod')}"
     param_name = f"{param_path}/task-trigger/openai-api-key"
 
     return get_ssm_parameter(param_name)
+
 
 def get_google_genai_api_key():
     """Obtiene la clave de API de Google GenAI desde Parameter Store."""
@@ -155,7 +157,7 @@ def get_scan_item(scan_id):
         return None
 
 
-def update_scan_status(scan_id, status, result=None):
+def update_scan_status(scan_id, status, result=None, scaned_files=0):
     """Actualiza el estado del escaneo en DynamoDB y opcionalmente el resultado."""
     # Obtener el nombre de la tabla
     nombre_tabla = get_task_table_name()
@@ -179,6 +181,12 @@ def update_scan_status(scan_id, status, result=None):
         update_expression += ", scan_result = :r"
         expression_attribute_values[":r"] = result
         LOGGER.info("Se incluirá el resultado en la actualización: %s", result)
+
+    # Si se proporciona el número de archivos escaneados, incluirlo en la actualización
+    if scaned_files is not None:
+        update_expression += ", scaned_files = :f"
+        expression_attribute_values[":f"] = scaned_files
+        LOGGER.info("Se incluirá el número de archivos escaneados en la actualización: %s", scaned_files)
 
     # Actualizar el item
     tabla.update_item(

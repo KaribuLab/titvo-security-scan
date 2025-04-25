@@ -80,7 +80,7 @@ def main():
     system_prompt = f"{base_prompt}\n\n{output_format}"
 
     model = init_chat_model(
-        utils.MODEL, model_provider="anthropic", api_key=aws_utils.get_anthropic_api_key()
+        utils.MODEL, model_provider="openai", api_key=aws_utils.get_openai_api_key()
     )
 
     LOGGER.info("Enviando código para análisis")
@@ -123,7 +123,7 @@ def process_github_scan(model, system_prompt, hint, item_scan):
         )
 
     # Obtener el contenido de los archivos
-    files_content = utils.get_files_content()
+    files_count, files_content = utils.get_files_content()
 
     # Preparar información del repositorio
     repo_info = {
@@ -176,6 +176,7 @@ def process_github_scan(model, system_prompt, hint, item_scan):
                 {
                     "issue_url": issue_url,
                 },
+                files_count,
             )
     else:
         result = {}
@@ -193,6 +194,7 @@ def process_github_scan(model, system_prompt, hint, item_scan):
             TITVO_SCAN_TASK_ID,
             "COMPLETED",
             result,
+            files_count,
         )
 
 
@@ -235,7 +237,7 @@ def process_bitbucket_scan(model, system_prompt, hint, item_scan):
             )
 
         # Obtener el contenido de los archivos
-        files_content = utils.get_files_content()
+        files_count, files_content = utils.get_files_content()
 
         # Preparar información del repositorio
         repo_info = {
@@ -295,6 +297,7 @@ def process_bitbucket_scan(model, system_prompt, hint, item_scan):
                     {
                         "report_url": report_url,
                     },
+                    files_count,
                 )
             else:
                 utils.exit_with_error(
@@ -320,6 +323,7 @@ def process_bitbucket_scan(model, system_prompt, hint, item_scan):
                 TITVO_SCAN_TASK_ID,
                 "COMPLETED",
                 result,
+                files_count,
             )
     except Exception as e:
         LOGGER.exception(e)
@@ -352,7 +356,7 @@ def process_cli_scan(model, system_prompt, hint, item_scan):
                 )
 
         # Obtener el contenido de los archivos
-        file_content = utils.get_files_content()
+        files_count, file_content = utils.get_files_content()
 
         LOGGER.debug("Contenido del archivo: %s", file_content)
 
@@ -400,6 +404,7 @@ def process_cli_scan(model, system_prompt, hint, item_scan):
                     {
                         "report_url": report_url,
                     },
+                    files_count,
                 )
             else:
                 utils.exit_with_error(
@@ -417,6 +422,7 @@ def process_cli_scan(model, system_prompt, hint, item_scan):
                 TITVO_SCAN_TASK_ID,
                 "COMPLETED",
                 result,
+                files_count,
             )
     except Exception as e:
         LOGGER.exception(e)
