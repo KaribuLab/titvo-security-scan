@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch, mock_open
 from datetime import datetime
+import pytest
 from titvo.app.scan.scan_use_case import RunScanUseCase
 from titvo.app.scan.scan_entities import Scan, ScanStatus, Prompt, ScanResult
 from titvo.app.task.task_entities import Task, TaskStatus, TaskSource
@@ -201,3 +202,72 @@ def test_run_scan_use_case_with_error():
         task.id, {"vulnerabilities": []}, 1  # len(files)
     )
     mock_mark_task_error_use_case.assert_not_called()
+
+
+def test_run_scan_use_case_with_exception():
+    # Arrange
+    mock_get_task_use_case = Mock()
+    mock_mark_task_in_progress_use_case = Mock()
+    mock_mark_task_completed_use_case = Mock()
+    mock_mark_task_failed_use_case = Mock()
+    mock_mark_task_error_use_case = Mock()
+    mock_ai_service = Mock()
+    mock_configuration_service = Mock()
+    mock_hint_use_case = Mock()
+    mock_file_fetcher_service_factory = Mock()
+    mock_output_service_factory = Mock()
+    
+    # Mock del task
+    task = Task(
+        id="task123",
+        result={},
+        args={"repository": "test-repo"},
+        hint_id="hint123",
+        scaned_files=0,
+        created_at=datetime(2024, 1, 1),
+        updated_at=datetime(2024, 1, 1),
+        status=TaskStatus.PENDING,
+        source=TaskSource.GITHUB,
+    )
+    
+    # Simular una excepción en algún punto del proceso
+    # En este caso, hacemos que get_hint_use_case lance una excepción
+    mock_get_task_use_case.execute.return_value = task
+    mock_hint_use_case.execute.side_effect = Exception("Error al obtener el hint")
+    
+    # Crear caso de uso
+    use_case = RunScanUseCase(
+        get_task_use_case=mock_get_task_use_case,
+        mark_task_in_progress_use_case=mock_mark_task_in_progress_use_case,
+        mark_task_completed_use_case=mock_mark_task_completed_use_case,
+        mark_task_failed_use_case=mock_mark_task_failed_use_case,
+        mark_task_error_use_case=mock_mark_task_error_use_case,
+        ai_service=mock_ai_service,
+        configuration_service=mock_configuration_service,
+        hint_use_case=mock_hint_use_case,
+        file_fetcher_service_factory=mock_file_fetcher_service_factory,
+        output_service_factory=mock_output_service_factory,
+        repo_files_path="/path/to/repo",
+    )
+    
+    # Act & Assert - Verificar que la excepción es propagada
+    with pytest.raises(Exception) as excinfo:
+        scan = Scan(id="task123")
+        use_case.execute(scan)
+    
+    # Verificar que la excepción capturada es la esperada
+    assert str(excinfo.value) == "Error al obtener el hint"
+    
+    # Verificar que se marcó la tarea con error antes de propagar la excepción
+    mock_mark_task_error_use_case.execute.assert_called_once_with(task.id)
+    
+    # Verificar que se ejecutaron los pasos previos a la excepción
+    mock_get_task_use_case.execute.assert_called_once_with("task123")
+    mock_mark_task_in_progress_use_case.execute.assert_called_once_with(task.id)
+    mock_configuration_service.get_value.assert_called_once_with("scan_system_prompt")
+    mock_hint_use_case.execute.assert_called_once_with(task.hint_id)
+    
+    # Verificar que no se ejecutaron los pasos posteriores a la excepción
+    mock_file_fetcher_service_factory.get_file_fetcher_service.assert_not_called()
+    mock_mark_task_completed_use_case.assert_not_called()
+    mock_mark_task_failed_use_case.assert_not_called()
