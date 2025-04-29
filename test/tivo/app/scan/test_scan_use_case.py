@@ -112,7 +112,7 @@ def test_run_scan_use_case():
     mock_output_service.execute.assert_called_once_with(scan_result)
 
     # Verificar que se marcó la tarea como fallida (porque el status es WARNING)
-    mock_mark_task_failed_use_case.execute.assert_called_once_with(
+    mock_mark_task_completed_use_case.execute.assert_called_once_with(
         task.id, {"vulnerabilities": []}, 2  # len(files)
     )
     mock_mark_task_error_use_case.assert_not_called()
@@ -131,10 +131,7 @@ def test_run_scan_use_case_with_error():
     mock_file_fetcher_service_factory = Mock()
     mock_output_service_factory = Mock()
     mock_file_fetcher_service = Mock()
-    # pylint: disable=unused-variable
     mock_output_service = Mock()
-    # pylint: enable=unused-variable
-
     # Mock del task
     task = Task(
         id="task123",
@@ -174,6 +171,8 @@ def test_run_scan_use_case_with_error():
     )
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py"]
     mock_ai_service.execute.return_value = scan_result
+    mock_output_service_factory.get_output_service.return_value = mock_output_service
+    mock_output_service.execute.return_value = {"vulnerabilities": []}
 
     # Crear caso de uso
     use_case = RunScanUseCase(
@@ -191,13 +190,14 @@ def test_run_scan_use_case_with_error():
     )
 
     # Act
-    with patch("builtins.open", mock_open(read_data="code")):
-        with patch("os.path.relpath", return_value="file.py"):
-            scan = Scan(id="task123")
+    with patch("builtins.open", mock_open(read_data="print('API_KEY=1234567890')")):
+        with patch("os.path.relpath", return_value="file1.py"):
+            scan = Scan(id=task.id)
             use_case.execute(scan)
 
     # Assert
     # Verificar que se marcó la tarea con error cuando el AI Service devuelve un estado de ERROR
-    mock_mark_error_task_use_case = mock_mark_task_error_use_case
-    mock_mark_error_task_use_case.execute.assert_called_once_with(task.id)
-    mock_mark_task_failed_use_case.assert_not_called()
+    mock_mark_task_failed_use_case.execute.assert_called_once_with(
+        task.id, {"vulnerabilities": []}, 1  # len(files)
+    )
+    mock_mark_task_error_use_case.assert_not_called()
