@@ -61,7 +61,7 @@ def test_run_scan_use_case():
     )
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py", "file2.py"]
     mock_ai_service.execute.return_value = scan_result
-    mock_output_service_factory.get_output_service.return_value = mock_output_service
+    mock_output_service_factory.create_output_service.return_value = mock_output_service
     mock_output_service.execute.return_value = {"vulnerabilities": []}
 
     # Crear caso de uso
@@ -109,7 +109,7 @@ def test_run_scan_use_case():
     assert "print('Hello, world!')" in prompt_arg.user_prompt
 
     # Verificar que se procesó el resultado correctamente
-    mock_output_service_factory.get_output_service.assert_called_once_with(task.source)
+    mock_output_service_factory.create_output_service.assert_called_once_with(task.source)
     mock_output_service.execute.assert_called_once_with(scan_result)
 
     # Verificar que se marcó la tarea como fallida (porque el status es WARNING)
@@ -172,7 +172,7 @@ def test_run_scan_use_case_with_error():
     )
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py"]
     mock_ai_service.execute.return_value = scan_result
-    mock_output_service_factory.get_output_service.return_value = mock_output_service
+    mock_output_service_factory.create_output_service.return_value = mock_output_service
     mock_output_service.execute.return_value = {"vulnerabilities": []}
 
     # Crear caso de uso

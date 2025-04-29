@@ -88,7 +88,7 @@ Fin de la lista de archivos.
 """
             prompt = Prompt(system_prompt, user_prompt)
             ai_result = self.ai_service.execute(prompt)
-            output_service = self.output_service_factory.get_output_service(task.source)
+            output_service = self.output_service_factory.create_output_service(task.source)
             output_result = output_service.execute(ai_result)
             if ai_result.status == ScanStatus.ERROR:
                 self.mark_task_failed_use_case.execute(

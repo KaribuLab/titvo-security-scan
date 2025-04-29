@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from titvo.app.scan.scan_entities import ScanResult
-
+from titvo.app.task.task_entities import TaskSource
 
 class OutputService(ABC):
     @abstractmethod
@@ -10,5 +10,5 @@ class OutputService(ABC):
 
 class OutputServiceFactory(ABC):
     @abstractmethod
-    def get_output_service(self, source: str) -> OutputService:
+    def create_output_service(self, source: TaskSource) -> OutputService:
         pass
