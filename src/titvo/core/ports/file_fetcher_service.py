@@ -9,5 +9,5 @@ class FileFetcherService(ABC):
 
 class FileFetcherServiceFactory(ABC):
     @abstractmethod
-    def get_file_fetcher_service(self, source: str) -> FileFetcherService:
+    def create_file_fetcher_service(self, source: str) -> FileFetcherService:
         pass
