@@ -1,5 +1,4 @@
 import logging
-import json
 from datetime import datetime
 import boto3
 import pytest
