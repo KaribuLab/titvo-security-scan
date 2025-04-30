@@ -15,6 +15,9 @@ class DynamoConfigurationService(ConfigurationService):
         ).get("SecretString")
         self.table_name = table_name
 
+    def get_encryption_key(self) -> str:
+        return self.encryption_key
+
     def get_value(self, name: str) -> str:
         response = self.dynamo_client.get_item(
             TableName=self.table_name, Key={"name": {"S": name}}
