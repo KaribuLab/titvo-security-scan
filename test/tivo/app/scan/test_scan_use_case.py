@@ -41,7 +41,7 @@ def test_run_scan_use_case():
         name="hint123",
         slug="hint123",
         url="hint123",
-        hint="Este es un hint de prueba",
+        content="Este es un hint de prueba",
     )
 
     # Mock de ScanResult
@@ -56,7 +56,7 @@ def test_run_scan_use_case():
     mock_get_task_use_case.execute.return_value = task
     mock_hint_use_case.execute.return_value = hint
     mock_configuration_service.get_value.return_value = "system prompt de prueba"
-    mock_file_fetcher_service_factory.get_file_fetcher_service.return_value = (
+    mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = (
         mock_file_fetcher_service
     )
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py", "file2.py"]
@@ -93,7 +93,7 @@ def test_run_scan_use_case():
     mock_mark_task_in_progress_use_case.execute.assert_called_once_with(task.id)
     mock_configuration_service.get_value.assert_called_once_with("scan_system_prompt")
     mock_hint_use_case.execute.assert_called_once_with(task.hint_id)
-    mock_file_fetcher_service_factory.get_file_fetcher_service.assert_called_once_with(
+    mock_file_fetcher_service_factory.create_file_fetcher_service.assert_called_once_with(
         task.source
     )
     mock_file_fetcher_service.fetch_files.assert_called_once()
@@ -152,7 +152,7 @@ def test_run_scan_use_case_with_error():
         name="hint123",
         slug="hint123",
         url="hint123",
-        hint="Este es un hint de prueba",
+        content="Este es un hint de prueba",
     )
 
     # Mock de ScanResult con ERROR
@@ -167,7 +167,7 @@ def test_run_scan_use_case_with_error():
     mock_get_task_use_case.execute.return_value = task
     mock_hint_use_case.execute.return_value = hint
     mock_configuration_service.get_value.return_value = "system prompt de prueba"
-    mock_file_fetcher_service_factory.get_file_fetcher_service.return_value = (
+    mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = (
         mock_file_fetcher_service
     )
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py"]
@@ -268,6 +268,6 @@ def test_run_scan_use_case_with_exception():
     mock_hint_use_case.execute.assert_called_once_with(task.hint_id)
     
     # Verificar que no se ejecutaron los pasos posteriores a la excepción
-    mock_file_fetcher_service_factory.get_file_fetcher_service.assert_not_called()
+    mock_file_fetcher_service_factory.create_file_fetcher_service.assert_not_called()
     mock_mark_task_completed_use_case.assert_not_called()
     mock_mark_task_failed_use_case.assert_not_called()
