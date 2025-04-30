@@ -84,4 +84,4 @@ def test_hint_not_found(dynamodb_table):
 
     # Verificar que se lance una excepción cuando el hint no existe
     with pytest.raises(KeyError):
-        repository.get_hint("nonexistent-hint") 
+        repository.get_hint("nonexistent-hint")
