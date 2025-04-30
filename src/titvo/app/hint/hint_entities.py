@@ -7,4 +7,4 @@ class Hint:
     name: str
     slug: str
     url: str
-    hint: str
+    content: str
