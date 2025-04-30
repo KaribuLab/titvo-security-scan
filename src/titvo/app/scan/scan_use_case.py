@@ -56,7 +56,9 @@ class RunScanUseCase:
             hint = self.hint_use_case.execute(task.hint_id)
             LOGGER.debug("Hint: %s", hint)
             file_fetcher_service = (
-                self.file_fetcher_service_factory.get_file_fetcher_service(task.source)
+                self.file_fetcher_service_factory.create_file_fetcher_service(
+                    task.source
+                )
             )
             files: List[str] = file_fetcher_service.fetch_files()
             files_code = ""
@@ -74,7 +76,7 @@ class RunScanUseCase:
                 user_prompt += f"""
 Titvo soy el jefe de seguridad. A continuación comenzaré a darte una lista de sugerencias para que las uses en tu análisis:
 ==================================
-{hint.hint}
+{hint.content}
 ==================================
 Fin de las sugerencias.
 """
@@ -88,9 +90,11 @@ Fin de la lista de archivos.
 """
             prompt = Prompt(system_prompt, user_prompt)
             ai_result = self.ai_service.execute(prompt)
-            output_service = self.output_service_factory.create_output_service(task.source)
+            output_service = self.output_service_factory.create_output_service(
+                task.source
+            )
             output_result = output_service.execute(ai_result)
-            if ai_result.status == ScanStatus.ERROR:
+            if ai_result.status == ScanStatus.FAILED:
                 self.mark_task_failed_use_case.execute(
                     task.id, output_result, len(files)
                 )

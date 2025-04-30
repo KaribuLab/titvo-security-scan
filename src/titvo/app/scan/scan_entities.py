@@ -6,8 +6,7 @@ from typing import List
 class ScanStatus(Enum):
     SUCCESS = "SUCCESS"
     WARNING = "WARNING"
-    ERROR = "ERROR"
-
+    FAILED = "FAILED"
 
 @dataclass
 class Scan:

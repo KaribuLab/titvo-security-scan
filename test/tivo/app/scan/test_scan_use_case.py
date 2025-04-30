@@ -158,7 +158,7 @@ def test_run_scan_use_case_with_error():
     # Mock de ScanResult con ERROR
     scan_result = ScanResult(
         introduction="Error en el análisis",
-        status=ScanStatus.ERROR,
+        status=ScanStatus.FAILED,
         number_of_issues=0,
         annotations=[],
     )
