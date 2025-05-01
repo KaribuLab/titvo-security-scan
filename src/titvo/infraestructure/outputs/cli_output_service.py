@@ -9,6 +9,12 @@ from titvo.infraestructure.outputs.html_report import create_issue_html
 
 
 @dataclass
+class CliOutputArgs:
+    batch_id: str
+    repository_url: str
+
+
+@dataclass
 class CliOutputResult(OutputResult):
     report_url: str
 
@@ -21,12 +27,14 @@ class CliOutputResult(OutputResult):
 class CliOutputService(OutputService):
     def __init__(
         self,
+        args: CliOutputArgs,
         configuration_service: ConfigurationService,
         storage_service: StorageService,
         template_path: str,
         scan_id: str,
         source: TaskSource,
     ):
+        self.args = args
         self.configuration_service = configuration_service
         self.storage_service = storage_service
         self.template_path = template_path

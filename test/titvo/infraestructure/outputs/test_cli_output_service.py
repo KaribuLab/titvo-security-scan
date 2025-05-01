@@ -4,6 +4,7 @@ import pytest
 from titvo.infraestructure.outputs.cli_output_service import (
     CliOutputService,
     CliOutputResult,
+    CliOutputArgs,
 )
 from titvo.app.scan.scan_entities import ScanResult, Annotation, ScanStatus
 from titvo.app.task.task_entities import TaskSource
@@ -73,12 +74,22 @@ def scan_id():
     return "test-scan-123"
 
 
+@pytest.fixture
+def cli_args():
+    """Fixture que crea argumentos para el CliOutputService."""
+    return CliOutputArgs(
+        batch_id="test-batch-123",
+        repository_url="https://github.com/test/repo"
+    )
+
+
 def test_execute(
     mock_config_service,
     mock_storage_service,
     sample_scan_result,
     template_path,
     scan_id,
+    cli_args,
 ):
     """Test que verifica la generación y carga del informe HTML."""
     # Mock para create_issue_html
@@ -92,6 +103,7 @@ def test_execute(
 
         # Crear servicio y ejecutar
         service = CliOutputService(
+            args=cli_args,
             configuration_service=mock_config_service,
             storage_service=mock_storage_service,
             template_path=template_path,
@@ -149,6 +161,7 @@ def test_execute_with_different_source(
     sample_scan_result,
     template_path,
     scan_id,
+    cli_args,
 ):
     """Test que verifica el uso de diferentes fuentes de tarea."""
     # Aplicar los patches
@@ -158,6 +171,7 @@ def test_execute_with_different_source(
 
         # Crear servicio con otra fuente
         service = CliOutputService(
+            args=cli_args,
             configuration_service=mock_config_service,
             storage_service=mock_storage_service,
             template_path=template_path,
@@ -184,6 +198,7 @@ def test_execute_with_error_creating_directory(
     sample_scan_result,
     template_path,
     scan_id,
+    cli_args,
 ):
     """Test que verifica el manejo de errores al crear directorios."""
     # Configurar makedirs para lanzar excepción
@@ -196,6 +211,7 @@ def test_execute_with_error_creating_directory(
 
         # Crear servicio
         service = CliOutputService(
+            args=cli_args,
             configuration_service=mock_config_service,
             storage_service=mock_storage_service,
             template_path=template_path,
@@ -211,7 +227,7 @@ def test_execute_with_error_creating_directory(
 
 
 def test_execute_with_missing_configuration(
-    mock_storage_service, sample_scan_result, template_path, scan_id
+    mock_storage_service, sample_scan_result, template_path, scan_id, cli_args
 ):
     """Test que verifica el manejo de configuración faltante."""
     # Crear mock del servicio de configuración que devuelve None
@@ -223,6 +239,7 @@ def test_execute_with_missing_configuration(
 
         # Crear servicio
         service = CliOutputService(
+            args=cli_args,
             configuration_service=mock_config,
             storage_service=mock_storage_service,
             template_path=template_path,

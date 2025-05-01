@@ -17,5 +17,7 @@ class OutputService(ABC):
 
 class OutputServiceFactory(ABC):
     @abstractmethod
-    def create_output_service(self, source: TaskSource) -> OutputService:
+    def create_output_service(
+        self, args: dict, scan_id: str, source: TaskSource
+    ) -> OutputService:
         pass
