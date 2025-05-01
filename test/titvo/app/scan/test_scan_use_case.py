@@ -109,7 +109,11 @@ def test_run_scan_use_case():
     assert "print('Hello, world!')" in prompt_arg.user_prompt
 
     # Verificar que se procesó el resultado correctamente
-    mock_output_service_factory.create_output_service.assert_called_once_with(task.source)
+    mock_output_service_factory.create_output_service.assert_called_once_with(
+        args=task.args,
+        scan_id=scan.id,
+        source=task.source,
+    )
     mock_output_service.execute.assert_called_once_with(scan_result)
 
     # Verificar que se marcó la tarea como fallida (porque el status es WARNING)
@@ -197,7 +201,23 @@ def test_run_scan_use_case_with_error():
             use_case.execute(scan)
 
     # Assert
-    # Verificar que se marcó la tarea con error cuando el AI Service devuelve un estado de ERROR
+    mock_get_task_use_case.execute.assert_called_once_with("task123")
+    mock_mark_task_in_progress_use_case.execute.assert_called_once_with(task.id)
+    mock_configuration_service.get_value.assert_called_once_with("scan_system_prompt")
+    mock_hint_use_case.execute.assert_called_once_with(task.hint_id)
+    mock_file_fetcher_service_factory.create_file_fetcher_service.assert_called_once_with(
+        task.source
+    )
+    mock_file_fetcher_service.fetch_files.assert_called_once()
+    
+    # Verificar que se creó el servicio de salida con los parámetros correctos
+    mock_output_service_factory.create_output_service.assert_called_once_with(
+        args=task.args,
+        scan_id=scan.id,
+        source=task.source,
+    )
+    
+    # Verificar que se marcó la tarea como fallida (porque el status es FAILED)
     mock_mark_task_failed_use_case.execute.assert_called_once_with(
         task.id, {"vulnerabilities": []}, 1  # len(files)
     )
