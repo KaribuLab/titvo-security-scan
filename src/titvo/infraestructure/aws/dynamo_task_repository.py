@@ -1,5 +1,6 @@
 import logging
 import json
+from datetime import datetime
 import boto3
 from dynamodb_json import json_util as dynamo_json
 from titvo.app.task.task_entities import Task, TaskStatus, TaskSource
@@ -18,14 +19,21 @@ class DynamoTaskRepository(TaskRepository):
             TableName=self.table_name, Key={"scan_id": {"S": task_id}}
         )
         item = dynamo_json.loads(response["Item"])
+        created_at = item["created_at"]
+        updated_at = item["updated_at"]
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at)
+            
         return Task(
             id=item["scan_id"],
             result=item["scan_result"],
             args=item["args"],
             hint_id=item["repository_id"],
             scaned_files=item["scaned_files"],
-            created_at=item["created_at"],
-            updated_at=item["updated_at"],
+            created_at=created_at,
+            updated_at=updated_at,
             status=TaskStatus(item["status"]),
             source=TaskSource(item["source"]),
         )
@@ -52,13 +60,22 @@ class DynamoTaskRepository(TaskRepository):
             "#status": "status",
             "#source": "source",
         }
+
+        created_at = task.created_at
+        updated_at = task.updated_at
+        
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at)
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at)
+            
         expression_attribute_values = {
             ":scan_result": {"M": json.loads(dynamo_json.dumps(task.result))},
             ":args": {"M": json.loads(dynamo_json.dumps(task.args))},
             ":hint_id": {"S": task.hint_id},
             ":scaned_files": {"N": str(task.scaned_files)},
-            ":created_at": {"S": task.created_at.isoformat()},
-            ":updated_at": {"S": task.updated_at.isoformat()},
+            ":created_at": {"S": created_at.isoformat()},
+            ":updated_at": {"S": updated_at.isoformat()},
             ":status": {"S": task.status.value},
             ":source": {"S": task.source.value},
         }
