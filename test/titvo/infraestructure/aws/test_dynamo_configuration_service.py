@@ -25,8 +25,8 @@ def dynamodb_table():
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.create_table(
             TableName=table_name,
-            KeySchema=[{"AttributeName": "name", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "name", "AttributeType": "S"}],
+            KeySchema=[{"AttributeName": "parameter_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "parameter_id", "AttributeType": "S"}],
             ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
         )
         yield table_name, table
@@ -50,7 +50,7 @@ def test_get_value(dynamodb_table, secretsmanager_key):
     key_name, _ = secretsmanager_key
 
     # Agregar un item de prueba
-    table.put_item(Item={"name": "test_config_key", "value": "test_config_value"})
+    table.put_item(Item={"parameter_id": "test_config_key", "value": "test_config_value"})
 
     # Instanciar servicio
     service = DynamoConfigurationService(table_name, key_name)
@@ -77,7 +77,7 @@ def test_get_secret(dynamodb_table, secretsmanager_key):
     encrypted_data = base64.b64encode(cipher.encrypt(padded_data)).decode("utf-8")
 
     # Agregar un item encriptado de prueba
-    table.put_item(Item={"name": "test_secret_key", "value": encrypted_data})
+    table.put_item(Item={"parameter_id": "test_secret_key", "value": encrypted_data})
 
     # Instanciar servicio
     service = DynamoConfigurationService(table_name, key_name)

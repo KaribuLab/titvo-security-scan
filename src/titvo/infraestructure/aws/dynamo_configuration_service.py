@@ -20,8 +20,10 @@ class DynamoConfigurationService(ConfigurationService):
 
     def get_value(self, name: str) -> str:
         response = self.dynamo_client.get_item(
-            TableName=self.table_name, Key={"name": {"S": name}}
+            TableName=self.table_name, Key={"parameter_id": {"S": name}}
         )
+        if "Item" not in response:
+            raise KeyError(f"Parameter not found: {name}")
         item = json.loads(response["Item"])
         return item["value"]
 
