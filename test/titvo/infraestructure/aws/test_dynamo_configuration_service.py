@@ -1,8 +1,8 @@
 import logging
 import base64
+from unittest.mock import patch
 import boto3
 import pytest
-from unittest.mock import patch, MagicMock
 from moto import mock_aws
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
