@@ -3,8 +3,12 @@ from abc import ABC, abstractmethod
 
 class ConfigurationService(ABC):
 
-
+    @abstractmethod
     def get_encryption_key(self) -> str:
+        pass
+
+    @abstractmethod
+    def decrypt(self, data: str) -> str:
         pass
 
     @abstractmethod

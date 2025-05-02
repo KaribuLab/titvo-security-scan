@@ -27,11 +27,11 @@ class DynamoConfigurationService(ConfigurationService):
         item = json.loads(response["Item"])
         return item["value"]
 
-    def __decrypt(self, data):
+    def decrypt(self, data):
         key = b64decode(self.encryption_key)
         cipher = AES.new(key, AES.MODE_ECB)
         decrypted_data = unpad(cipher.decrypt(b64decode(data)), AES.block_size)
         return decrypted_data.decode("utf-8")
 
     def get_secret(self, name: str) -> str:
-        return self.__decrypt(self.get_value(name))
+        return self.decrypt(self.get_value(name))
