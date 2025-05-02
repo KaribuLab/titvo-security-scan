@@ -25,11 +25,11 @@ class DynamoTaskRepository(TaskRepository):
             created_at = datetime.fromisoformat(created_at)
         if isinstance(updated_at, str):
             updated_at = datetime.fromisoformat(updated_at)
-
+        LOGGER.debug("Item: %s", item)
         return Task(
             id=item["scan_id"],
-            result=item["scan_result"],
-            args=item["args"],
+            result=item.get("result", {}),
+            args=item.get("args", {}),
             hint_id=item["repository_id"],
             scaned_files=item["scaned_files"],
             created_at=created_at,
