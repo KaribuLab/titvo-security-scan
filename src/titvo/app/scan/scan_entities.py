@@ -33,7 +33,6 @@ class Annotation:
 
 @dataclass
 class ScanResult:
-    introduction: str
     status: ScanStatus
     number_of_issues: int
     annotations: List[Annotation]

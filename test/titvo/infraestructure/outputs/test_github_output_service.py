@@ -33,7 +33,6 @@ def github_args():
 def sample_scan_result():
     """Fixture que crea un resultado de escaneo de prueba."""
     return ScanResult(
-        introduction="Se ha realizado un análisis de seguridad del código",
         status=ScanStatus.FAILED,
         number_of_issues=1,
         annotations=[
@@ -145,7 +144,6 @@ def test_execute_multiple_annotations(
     """Test que verifica la creación de issues con múltiples anotaciones."""
     # Crear un resultado de escaneo con múltiples anotaciones
     scan_result = ScanResult(
-        introduction="Se ha realizado un análisis de seguridad del código",
         status=ScanStatus.FAILED,
         number_of_issues=2,
         annotations=[

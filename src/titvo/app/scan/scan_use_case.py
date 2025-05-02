@@ -57,19 +57,18 @@ class RunScanUseCase:
             LOGGER.debug("Hint: %s", hint)
             file_fetcher_service = (
                 self.file_fetcher_service_factory.create_file_fetcher_service(
-                    task.source
+                    task.args, task.source
                 )
             )
             files: List[str] = file_fetcher_service.fetch_files()
             files_code = ""
             for file in files:
-                relative_path = os.path.relpath(file, self.repo_files_path)
-                with open(file, "r", encoding="utf-8") as f:
+                LOGGER.info("File: %s", file)
+                repo_file_path = os.path.join(self.repo_files_path, file)
+                with open(repo_file_path, "r", encoding="utf-8") as f:
                     file_content = f.read()
 
-                files_code += (
-                    f"\n\n**Archivo: {relative_path}**\n```\n{file_content}\n```"
-                )
+                files_code += f"\n\n**Archivo: {file}**\n```\n{file_content}\n```"
             LOGGER.debug("Files code: %s", files_code)
             user_prompt = ""
             if hint is not None:
@@ -98,11 +97,11 @@ Fin de la lista de archivos.
             output_result = output_service.execute(ai_result)
             if ai_result.status == ScanStatus.FAILED:
                 self.mark_task_failed_use_case.execute(
-                    task.id, output_result, len(files)
+                    task.id, output_result.to_dict(), len(files)
                 )
             else:
                 self.mark_task_completed_use_case.execute(
-                    task.id, output_result, len(files)
+                    task.id, output_result.to_dict(), len(files)
                 )
         except Exception as e:
             self.mark_task_error_use_case.execute(task.id)

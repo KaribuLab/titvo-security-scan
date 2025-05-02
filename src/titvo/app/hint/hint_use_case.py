@@ -6,5 +6,5 @@ class GetHintUseCase:
     def __init__(self, hint_repository: HintRepository):
         self.hint_repository = hint_repository
 
-    def execute(self, hint_id: str) -> Hint:
+    def execute(self, hint_id: str) -> Hint | None:
         return self.hint_repository.get_hint(hint_id)

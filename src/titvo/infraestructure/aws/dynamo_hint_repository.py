@@ -9,11 +9,13 @@ class DynamoHintRepository(HintRepository):
         self.table_name = table_name
         self.dynamo_client = boto3.client("dynamodb")
 
-    def get_hint(self, hint_id: str) -> Hint:
+    def get_hint(self, hint_id: str) -> Hint | None:
         response = self.dynamo_client.get_item(
             TableName=self.table_name,
-            Key={"hint_id": {"S": hint_id}},
+            Key={"repository_id": {"S": hint_id}},
         )
+        if "Item" not in response:
+            return None
         item = json.loads(response["Item"])
         return Hint(
             id=item["hint_id"],

@@ -14,10 +14,10 @@ RUN chown -R titvo:titvo /app
 # Instalar dependencias
 RUN pip install -r requirements.txt
 
-COPY ./ /app
-
+COPY ./src/titvo /app/titvo
+COPY ./src/container_runner.py /app/container_runner.py
 # Cambiar al usuario no privilegiado
 USER titvo
 
 # Comando para ejecutar el script
-CMD ["python", "main.py"]
+CMD ["python", "/app/container_runner.py"]

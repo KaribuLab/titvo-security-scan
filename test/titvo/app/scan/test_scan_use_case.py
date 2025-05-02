@@ -46,7 +46,6 @@ def test_run_scan_use_case():
 
     # Mock de ScanResult
     scan_result = ScanResult(
-        introduction="Introducción del análisis",
         status=ScanStatus.WARNING,
         number_of_issues=2,
         annotations=[],
@@ -56,13 +55,15 @@ def test_run_scan_use_case():
     mock_get_task_use_case.execute.return_value = task
     mock_hint_use_case.execute.return_value = hint
     mock_configuration_service.get_value.return_value = "system prompt de prueba"
-    mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = (
-        mock_file_fetcher_service
-    )
+    mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = mock_file_fetcher_service
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py", "file2.py"]
     mock_ai_service.execute.return_value = scan_result
     mock_output_service_factory.create_output_service.return_value = mock_output_service
-    mock_output_service.execute.return_value = {"vulnerabilities": []}
+    
+    # Crear un objeto que tenga método to_dict
+    output_result = Mock()
+    output_result.to_dict.return_value = {"vulnerabilities": []}
+    mock_output_service.execute.return_value = output_result
 
     # Crear caso de uso
     use_case = RunScanUseCase(
@@ -84,9 +85,8 @@ def test_run_scan_use_case():
 
     # Act
     with patch("builtins.open", mock_open(read_data=mock_file_content)):
-        with patch("os.path.relpath", return_value="relative/path/to/file.py"):
-            scan = Scan(id="task123")
-            use_case.execute(scan)
+        scan = Scan(id="task123")
+        use_case.execute(scan)
 
     # Assert
     mock_get_task_use_case.execute.assert_called_once_with("task123")
@@ -94,7 +94,7 @@ def test_run_scan_use_case():
     mock_configuration_service.get_value.assert_called_once_with("scan_system_prompt")
     mock_hint_use_case.execute.assert_called_once_with(task.hint_id)
     mock_file_fetcher_service_factory.create_file_fetcher_service.assert_called_once_with(
-        task.source
+        task.args, task.source
     )
     mock_file_fetcher_service.fetch_files.assert_called_once()
 
@@ -105,7 +105,8 @@ def test_run_scan_use_case():
     assert prompt_arg.system_prompt == "system prompt de prueba"
     assert "Titvo soy el jefe de seguridad" in prompt_arg.user_prompt
     assert "Este es un hint de prueba" in prompt_arg.user_prompt
-    assert "Archivo: relative/path/to/file.py" in prompt_arg.user_prompt
+    assert "**Archivo: file1.py**" in prompt_arg.user_prompt
+    assert "**Archivo: file2.py**" in prompt_arg.user_prompt
     assert "print('Hello, world!')" in prompt_arg.user_prompt
 
     # Verificar que se procesó el resultado correctamente
@@ -116,9 +117,9 @@ def test_run_scan_use_case():
     )
     mock_output_service.execute.assert_called_once_with(scan_result)
 
-    # Verificar que se marcó la tarea como fallida (porque el status es WARNING)
+    # Verificar que se marcó la tarea como completada (porque el status es WARNING)
     mock_mark_task_completed_use_case.execute.assert_called_once_with(
-        task.id, {"vulnerabilities": []}, 2  # len(files)
+        task.id, output_result.to_dict(), 2  # len(files)
     )
     mock_mark_task_error_use_case.assert_not_called()
 
@@ -161,7 +162,6 @@ def test_run_scan_use_case_with_error():
 
     # Mock de ScanResult con ERROR
     scan_result = ScanResult(
-        introduction="Error en el análisis",
         status=ScanStatus.FAILED,
         number_of_issues=0,
         annotations=[],
@@ -171,13 +171,15 @@ def test_run_scan_use_case_with_error():
     mock_get_task_use_case.execute.return_value = task
     mock_hint_use_case.execute.return_value = hint
     mock_configuration_service.get_value.return_value = "system prompt de prueba"
-    mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = (
-        mock_file_fetcher_service
-    )
+    mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = mock_file_fetcher_service
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py"]
     mock_ai_service.execute.return_value = scan_result
     mock_output_service_factory.create_output_service.return_value = mock_output_service
-    mock_output_service.execute.return_value = {"vulnerabilities": []}
+    
+    # Crear un objeto que tenga método to_dict
+    output_result = Mock()
+    output_result.to_dict.return_value = {"vulnerabilities": []}
+    mock_output_service.execute.return_value = output_result
 
     # Crear caso de uso
     use_case = RunScanUseCase(
@@ -196,9 +198,8 @@ def test_run_scan_use_case_with_error():
 
     # Act
     with patch("builtins.open", mock_open(read_data="print('API_KEY=1234567890')")):
-        with patch("os.path.relpath", return_value="file1.py"):
-            scan = Scan(id=task.id)
-            use_case.execute(scan)
+        scan = Scan(id=task.id)
+        use_case.execute(scan)
 
     # Assert
     mock_get_task_use_case.execute.assert_called_once_with("task123")
@@ -206,7 +207,7 @@ def test_run_scan_use_case_with_error():
     mock_configuration_service.get_value.assert_called_once_with("scan_system_prompt")
     mock_hint_use_case.execute.assert_called_once_with(task.hint_id)
     mock_file_fetcher_service_factory.create_file_fetcher_service.assert_called_once_with(
-        task.source
+        task.args, task.source
     )
     mock_file_fetcher_service.fetch_files.assert_called_once()
     
@@ -219,7 +220,7 @@ def test_run_scan_use_case_with_error():
     
     # Verificar que se marcó la tarea como fallida (porque el status es FAILED)
     mock_mark_task_failed_use_case.execute.assert_called_once_with(
-        task.id, {"vulnerabilities": []}, 1  # len(files)
+        task.id, output_result.to_dict(), 1  # len(files)
     )
     mock_mark_task_error_use_case.assert_not_called()
 

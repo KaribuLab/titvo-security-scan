@@ -34,7 +34,8 @@ class GithubOutputService(OutputService):
     ):
         self.args = args
         self.configuration_service = configuration_service
-        self.github_instance = Github(self.args.github_token)
+        self.access_token = self.configuration_service.decrypt(self.args.github_token)
+        self.github_instance = Github(self.access_token)
 
     def execute(self, scan_result: ScanResult) -> OutputResult:
         repo = self.github_instance.get_repo(self.args.github_repo_name)

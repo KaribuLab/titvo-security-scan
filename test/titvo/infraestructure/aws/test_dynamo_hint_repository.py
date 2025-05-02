@@ -23,8 +23,8 @@ def dynamodb_table():
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.create_table(
             TableName=table_name,
-            KeySchema=[{"AttributeName": "hint_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "hint_id", "AttributeType": "S"}],
+            KeySchema=[{"AttributeName": "repository_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "repository_id", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST",
         )
         yield table_name, table
@@ -50,6 +50,7 @@ def test_get_hint(dynamodb_table, sample_hint):
 
     # Convertir el hint a formato DynamoDB y almacenarlo
     hint_dict = {
+        "repository_id": sample_hint.id,
         "hint_id": sample_hint.id,
         "name": sample_hint.name,
         "slug": sample_hint.slug,
@@ -82,6 +83,5 @@ def test_hint_not_found(dynamodb_table):
     # Instanciar repositorio
     repository = DynamoHintRepository(table_name)
 
-    # Verificar que se lance una excepción cuando el hint no existe
-    with pytest.raises(KeyError):
-        repository.get_hint("nonexistent-hint")
+    # Verificar que se devuelve None cuando el hint no existe
+    assert repository.get_hint("nonexistent-hint") is None

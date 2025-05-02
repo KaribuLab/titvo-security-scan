@@ -44,7 +44,6 @@ def mock_storage_service():
 def sample_scan_result():
     """Fixture que crea un resultado de escaneo de prueba."""
     return ScanResult(
-        introduction="Se ha realizado un análisis de seguridad del código",
         status=ScanStatus.FAILED,
         number_of_issues=1,
         annotations=[

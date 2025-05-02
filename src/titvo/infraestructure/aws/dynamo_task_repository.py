@@ -25,7 +25,7 @@ class DynamoTaskRepository(TaskRepository):
             created_at = datetime.fromisoformat(created_at)
         if isinstance(updated_at, str):
             updated_at = datetime.fromisoformat(updated_at)
-            
+
         return Task(
             id=item["scan_id"],
             result=item["scan_result"],
@@ -63,15 +63,25 @@ class DynamoTaskRepository(TaskRepository):
 
         created_at = task.created_at
         updated_at = task.updated_at
-        
+
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at)
         if isinstance(updated_at, str):
             updated_at = datetime.fromisoformat(updated_at)
-            
+
+        LOGGER.debug("Created at: %s", created_at)
+        LOGGER.debug("Updated at: %s", updated_at)
+        LOGGER.debug("Result: %s", task.result)
+        LOGGER.debug("Args: %s", task.args)
+        LOGGER.debug("Hint id: %s", task.hint_id)
+        LOGGER.debug("Scaned files: %s", task.scaned_files)
+        LOGGER.debug("Status: %s", task.status)
+        LOGGER.debug("Source: %s", task.source)
+        scan_result = dynamo_json.dumps(task.result)
+        scan_args = dynamo_json.dumps(task.args)
         expression_attribute_values = {
-            ":scan_result": {"M": json.loads(dynamo_json.dumps(task.result))},
-            ":args": {"M": json.loads(dynamo_json.dumps(task.args))},
+            ":scan_result": {"M": json.loads(scan_result)},
+            ":args": {"M": json.loads(scan_args)},
             ":hint_id": {"S": task.hint_id},
             ":scaned_files": {"N": str(task.scaned_files)},
             ":created_at": {"S": created_at.isoformat()},
@@ -82,12 +92,11 @@ class DynamoTaskRepository(TaskRepository):
         LOGGER.debug("Update expression: %s", update_expression)
         LOGGER.debug("Expression attribute names: %s", expression_attribute_names)
         LOGGER.debug("Expression attribute values: %s", expression_attribute_values)
-        response = self.dynamo_client.update_item(
+        self.dynamo_client.update_item(
             TableName=self.table_name,
             Key={"scan_id": {"S": task.id}},
             UpdateExpression=update_expression,
             ExpressionAttributeNames=expression_attribute_names,
             ExpressionAttributeValues=expression_attribute_values,
         )
-        LOGGER.debug("Task updated: %s", response)
         return task

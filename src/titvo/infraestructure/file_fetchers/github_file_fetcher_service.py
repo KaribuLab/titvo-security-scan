@@ -25,7 +25,8 @@ class GithubFileFetcherService(FileFetcherService):
         self.args = args
         self.configuration_service = configuration_service
         self.repo_files_path = repo_files_path
-        self.github_instance = Github(self.args.github_token)
+        self.access_token = self.configuration_service.decrypt(self.args.github_token)
+        self.github_instance = Github(self.access_token)
 
     def fetch_files(self) -> List[str]:
         repo = self.github_instance.get_repo(self.args.github_repo_name)

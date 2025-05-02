@@ -32,7 +32,11 @@ class OutputsServiceFactoryImpl(OutputServiceFactory):
     ) -> OutputService:
         if source == TaskSource.BITBUCKET:
             return BitbucketOutputService(
-                args=BitbucketOutputArgs(**args),
+                args=BitbucketOutputArgs(
+                    bitbucket_commit=args["bitbucket_commit"],
+                    bitbucket_workspace=args["bitbucket_workspace"],
+                    bitbucket_repo_slug=args["bitbucket_repo_slug"],
+                ),
                 configuration_service=self.configuration_service,
                 storage_service=self.storage_service,
                 template_path=self.template_path,
@@ -41,12 +45,20 @@ class OutputsServiceFactoryImpl(OutputServiceFactory):
             )
         elif source == TaskSource.GITHUB:
             return GithubOutputService(
-                args=GithubOutputArgs(**args),
+                args=GithubOutputArgs(
+                    github_token=args["github_token"],
+                    github_repo_name=args["github_repo_name"],
+                    github_commit_sha=args["github_commit_sha"],
+                    github_assignee=args["github_assignee"],
+                ),
                 configuration_service=self.configuration_service,
             )
         elif source == TaskSource.CLI:
             return CliOutputService(
-                args=CliOutputArgs(**args),
+                args=CliOutputArgs(
+                    batch_id=args["batch_id"],
+                    repository_url=args["repository_url"],
+                ),
                 configuration_service=self.configuration_service,
                 storage_service=self.storage_service,
                 template_path=self.template_path,

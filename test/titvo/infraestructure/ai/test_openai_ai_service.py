@@ -36,7 +36,6 @@ def sample_prompt():
 def sample_security_report():
     """Fixture que crea un informe de seguridad de ejemplo."""
     return SecurityReport(
-        introduction="Se ha realizado un análisis de seguridad del código proporcionado",
         status="FAILED",
         number_of_issues=1,
         annotations=[
@@ -74,7 +73,7 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
         mock_config_service.get_value.assert_called_once_with("open_ai_model")
 
         # Verificar que se inicializa el modelo con los parámetros correctos
-        mock_llm.with_structured_output.assert_called_once_with(SecurityReport)
+        mock_llm.with_structured_output.assert_called_once_with(SecurityReport, method="json_mode")
 
         # Verificar que se invoca el LLM con los mensajes correctos
         messages = mock_structured_output.invoke.call_args[0][0]
@@ -82,10 +81,9 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
         assert isinstance(messages[0], SystemMessage)
         assert messages[0].content == sample_prompt.system_prompt
         assert isinstance(messages[1], HumanMessage)
-        assert messages[1].content == sample_prompt.user_prompt
+        assert messages[1].content == f"{sample_prompt.user_prompt}\nIncluye todos los campos de la estructa JSON"
 
         # Verificar el resultado
-        assert result.introduction == sample_security_report.introduction
         assert result.status == ScanStatus(sample_security_report.status)
         assert result.number_of_issues == sample_security_report.number_of_issues
         assert len(result.annotations) == 1
@@ -126,13 +124,11 @@ def test_scan_status_mapping(mock_config_service, sample_prompt):
     # Crear informes con diferentes estados
     status_reports = {
         "SUCCESS": SecurityReport(
-            introduction="Análisis completado sin problemas",
             status="SUCCESS",
             number_of_issues=0,
             annotations=[],
         ),
         "WARNING": SecurityReport(
-            introduction="Análisis completado con advertencias",
             status="WARNING",
             number_of_issues=1,
             annotations=[
@@ -149,7 +145,6 @@ def test_scan_status_mapping(mock_config_service, sample_prompt):
             ],
         ),
         "FAILED": SecurityReport(
-            introduction="Análisis completado con problemas críticos",
             status="FAILED",
             number_of_issues=1,
             annotations=[
