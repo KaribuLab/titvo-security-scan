@@ -28,6 +28,10 @@ dependency parameters {
       "/tvo/security-scan/test/infra/subnet1"                     = "subnet-0c4b3b6b1b7b3b3b3"
       "/tvo/security-scan/test/infra/dynamo-task-table-arn"       = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-task-table-test"
       "/tvo/security-scan/test/infra/dynamo-repository-table-arn" = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-repository-table-test"
+      "/tvo/security-scan/test/infra/dynamo-hint-table-arn"       = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-hint-table-test"
+      "/tvo/security-scan/test/infra/dynamo-cli-files-table-arn"  = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-cli-files-table-test"
+      "/tvo/security-scan/test/infra/dynamo-prompt-table-arn"     = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-prompt-table-test"
+      "/tvo/security-scan/test/infra/encryption-key-name"         = "/tvo/security-scan/test/infra/encryption-key"
       "/tvo/security-scan/prod/infra/vpc-id"                      = "vpc-000000000000000"
       "/tvo/security-scan/prod/infra/subnet1"                     = "subnet-0c4b3b6b1b7b3b3b3"
       "/tvo/security-scan/prod/infra/dynamo-task-table-arn"       = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-task-table-prod"
@@ -35,6 +39,7 @@ dependency parameters {
       "/tvo/security-scan/prod/infra/report-bucket-arn"           = "arn:aws:s3:::devsecops-titvo-com-report-bucket"
       "/tvo/security-scan/prod/infra/dynamo-cli-files-table-arn"  = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-cli-files-table-prod"
       "/tvo/security-scan/prod/infra/dynamo-prompt-table-arn"     = "arn:aws:dynamodb:us-east-1:000000000000:table/tvo-github-security-scan-prompt-table-prod"
+      "/tvo/security-scan/prod/infra/encryption-key-name"         = "/tvo/security-scan/prod/infra/encryption-key"
     }
   }
 }
@@ -49,12 +54,32 @@ inputs = {
   max_vcpus          = 16
   job_vcpu           = 2
   job_memory         = 4096
-  job_command        = ["python", "main.py"]
+  job_command        = ["python", "/app/container_runner.py"]
   vpc_id             = dependency.parameters.outputs.parameters["${local.base_path}/infra/vpc-id"]
   job_environment = [
     {
-      name : "AWS_STAGE",
-      value : local.serverless.locals.stage
+      name : "TITVO_DYNAMO_TASK_TABLE_NAME",
+      value : dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-task-table-name"]
+    },
+    {
+      name  = "TITVO_DYNAMO_CONFIGURATION_TABLE_NAME"
+      value = dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-configuration-table-name"]
+    },
+    {
+      name  = "TITVO_DYNAMO_HINT_TABLE_NAME"
+      value = dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-hint-table-name"]
+    },
+    {
+      name  = "TITVO_DYNAMO_CLI_FILES_TABLE_NAME"
+      value = dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-cli-files-table-name"]
+    },
+    {
+      name  = "TITVO_DYNAMO_CLI_FILES_BUCKET_NAME"
+      value = dependency.parameters.outputs.parameters["${local.base_path}/infra/cli-files-bucket-name"]
+    },
+    {
+      name  = "TITVO_ENCRYPTION_KEY_NAME"
+      value = dependency.parameters.outputs.parameters["${local.base_path}/infra/encryption-key-name"]
     }
   ]
   job_policy = jsonencode({
@@ -87,7 +112,7 @@ inputs = {
         ],
         "Resource" : [
           dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-repository-table-arn"],
-          dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-prompt-table-arn"]
+          dependency.parameters.outputs.parameters["${local.base_path}/infra/dynamo-configuration-table-arn"],
         ]
       },
       {
@@ -104,6 +129,7 @@ inputs = {
         "Effect" : "Allow",
         "Action" : [
           "s3:GetObject",
+          "s3:GetObjectVersion",
           "s3:ListBucket"
         ],
         "Resource" : [
@@ -123,7 +149,9 @@ inputs = {
       {
         "Effect" : "Allow",
         "Action" : [
-          "s3:PutObject"
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+          "s3:PutObjectTagging"
         ],
         "Resource" : [
           dependency.parameters.outputs.parameters["${local.base_path}/infra/report-bucket-arn"],
