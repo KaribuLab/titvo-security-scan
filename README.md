@@ -1,41 +1,110 @@
-# Analizador de Seguridad para Commits de SCM
+# Analizador de Seguridad para Commits de SCM (TITVO)
 
-Este proyecto contiene un conjunto de scripts que analizan automáticamente commits de GitHub, Bitbucket o CLI en busca de vulnerabilidades de seguridad utilizando Claude 3.7 Sonnet de Anthropic.
+Este proyecto contiene un sistema que analiza automáticamente commits de GitHub, Bitbucket o archivos enviados por CLI en busca de vulnerabilidades de seguridad utilizando modelos avanzados de OpenAI.
 
 ## Funcionalidades
 
 - Descarga automática de archivos de commits específicos desde:
-  - GitHub
-  - Bitbucket
-  - CLI (mediante archivos tar.gz en S3)
-- Análisis de seguridad del código utilizando Claude 3.7 Sonnet
+  - GitHub (usando la API de GitHub)
+  - Bitbucket (usando la API REST de Bitbucket)
+  - CLI (mediante archivos tar.gz almacenados en S3)
+- Análisis de seguridad del código utilizando modelos de OpenAI
 - Creación automática de issues en GitHub con los resultados del análisis
 - Generación de reportes de código en Bitbucket con las vulnerabilidades encontradas
-- Detección de patrones específicos para aprobar o rechazar commits
+- Generación de reportes para archivos subidos por CLI
 - Seguimiento del estado de los escaneos en DynamoDB
-- Obtención de configuración desde AWS Parameter Store y Secret Manager
+- Almacenamiento seguro de configuración en AWS Parameter Store y Secret Manager
 - System prompt configurable a través de Parameter Store
 - Nivel de logging configurable mediante variable de entorno
 
-## Organización del Código
+## Arquitectura
 
-El proyecto está organizado de forma modular:
+El proyecto sigue una arquitectura hexagonal (puertos y adaptadores) que separa la lógica de negocio de la infraestructura:
 
-- `main.py`: Coordina el flujo de trabajo general y delega en los módulos específicos
-- `github_handler.py`: Contiene toda la lógica para interactuar con GitHub
-- `bitbucket_handler.py`: Contiene toda la lógica para interactuar con Bitbucket
-- `cli_handler.py`: Maneja las operaciones relacionadas con escaneos desde CLI
-- `utils.py`: Proporciona funciones comunes como análisis de código y generación de prompts
-- `aws_utils.py`: Contiene toda la lógica de interacción con servicios AWS
+### Core (Dominio)
+- Entidades y lógica de negocio independientes de infraestructura
+- Puertos definidos como interfaces abstractas
+- Casos de uso que orquestan la lógica del dominio
 
-## Requisitos
+### Infraestructura
+- Implementaciones concretas de los puertos definidos en el core
+- Adaptadores para servicios externos (AWS, GitHub, Bitbucket)
+- Servicios para almacenamiento, configuración y AI
+
+### Aplicación
+- Orquestación de casos de uso
+- Gestión de tareas y flujos de trabajo
+- Manejo de estado y progreso de escaneos
+
+## Componentes Principales
+
+### Servicios de Infraestructura
+- **AWS**:
+  - `DynamoConfigurationService`: Gestión de configuración usando DynamoDB
+  - `S3StorageService`: Almacenamiento de archivos y reportes en S3
+  - `DynamoTaskRepository`: Almacenamiento y seguimiento de tareas en DynamoDB
+  - `DynamoHintRepository`: Almacenamiento de sugerencias en DynamoDB
+  - `DynamoCliFilesRepository`: Gestión de archivos CLI en DynamoDB
+
+- **Obtención de Archivos**:
+  - `GithubFileFetcherService`: Descarga de archivos desde GitHub
+  - `BitbucketFileFetcherService`: Descarga de archivos desde Bitbucket
+  - `CliFileFetcherService`: Extracción de archivos desde tar.gz en S3
+
+- **IA y Análisis**:
+  - `OpenAIAiService`: Integración con OpenAI para análisis de seguridad
+
+- **Servicios de Salida**:
+  - `GithubOutputService`: Creación de issues en GitHub
+  - `BitbucketOutputService`: Generación de reportes en Bitbucket
+  - `CliOutputService`: Generación de reportes HTML para CLI
+
+### Casos de Uso
+- `ScanUseCase`: Orquestra el proceso completo de escaneo
+- `TaskUseCase`: Gestión del ciclo de vida de tareas
+
+## Estructura del Proyecto
+
+```
+src/titvo/
+├── app/                    # Capa de aplicación
+│   ├── cli_files/          # Entidades para archivos CLI
+│   ├── scan/               # Casos de uso para escaneos
+│   └── task/               # Gestión de tareas
+│
+├── core/                   # Dominio y lógica de negocio
+│   ├── entities/           # Entidades del dominio
+│   └── ports/              # Interfaces (puertos)
+│
+└── infraestructure/        # Implementaciones de infraestructura
+    ├── ai/                 # Servicios de IA
+    ├── aws/                # Servicios de AWS
+    ├── file_fetchers/      # Servicios de obtención de archivos
+    └── outputs/            # Servicios de salida
+```
+
+## Pruebas
+
+El proyecto incluye pruebas unitarias e integración usando pytest y moto:
+
+- **Pruebas Unitarias**: Validan componentes individuales con mocks
+- **Pruebas de Integración**: Prueban la interacción entre componentes
+- **Moto**: Simula servicios AWS (S3, DynamoDB) para pruebas sin conexión real
+
+### Ejemplos de Pruebas
+- Pruebas de repositorios DynamoDB
+- Pruebas de servicios de almacenamiento S3
+- Pruebas de obtención de archivos (GitHub, Bitbucket, CLI)
+- Pruebas de servicios de salida
+
+## Requerimientos
 
 - Python 3.8 o superior
-- Una clave API de Anthropic
-- Acceso a AWS (DynamoDB, Parameter Store y Secret Manager)
-- Dependiendo del origen:
-  - Un token de GitHub con permisos para crear issues
-  - Credenciales de Bitbucket para crear reportes de código
+- Una clave API de OpenAI
+- Acceso a AWS (DynamoDB, Parameter Store, Secret Manager, S3)
+- Según el origen:
+  - Token de GitHub con permisos para crear issues
+  - Credenciales de Bitbucket para reportes de código
   - Acceso a S3 para archivos CLI
 
 ## Instalación
@@ -51,130 +120,73 @@ cd github-security-scan
 pip install -r requirements.txt
 ```
 
-3. Configura las variables de entorno:
-   - Crea un archivo `.env` con las siguientes variables:
-   ```
-   TITVO_SCAN_TASK_ID=identificador_unico_del_escaneo
-   AWS_STAGE=prod  # o 'dev' para entorno de desarrollo
-   LOG_LEVEL=INFO  # opciones: DEBUG, INFO, WARNING, ERROR, CRITICAL
-   ```
-
-## Uso del script
-
-El script `main.py` analiza un commit específico de GitHub, Bitbucket o CLI y gestiona los resultados según el origen.
-
-### Cómo usar el script
-
-1. Configura las variables de entorno en el archivo `.env`
-2. Ejecuta el script:
+3. Configura las variables de entorno obligatorias en un archivo `.env`:
 ```bash
-python main.py
+# Identificador único del escaneo (elige uno según el origen)
+# Para CLI
+TITVO_SCAN_TASK_ID=tvo-scan-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# Para Bitbucket
+#TITVO_SCAN_TASK_ID=tvo-scan-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# Para Github
+#TITVO_SCAN_TASK_ID=tvo-scan-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# Configuración de AWS
+AWS_REGION=us-east-1
+AWS_DEFAULT_REGION=us-east-1
+AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXX
+AWS_SECRET_ACCESS_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Nombres de las tablas DynamoDB y buckets S3
+TITVO_DYNAMO_TASK_TABLE_NAME=tvo-security-scan-task-task-prod
+TITVO_DYNAMO_CONFIGURATION_TABLE_NAME=tvo-security-scan-parameter-configuration-prod
+TITVO_DYNAMO_HINT_TABLE_NAME=tvo-security-scan-account-repository-prod
+TITVO_DYNAMO_CLI_FILES_TABLE_NAME=tvo-security-scan-task-cli-files-prod
+TITVO_DYNAMO_CLI_FILES_BUCKET_NAME=tvo-security-scan-cli-files-prod
+
+# Clave de cifrado
+TITVO_ENCRYPTION_KEY_NAME=/tvo/security-scan/prod/aes_secret
+
+# Nivel de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+TITVO_LOG_LEVEL=INFO
+
+# Opcionales
+#TITVO_TEMPLATE_PATH=templates
+#TITVO_REPO_FILES_PATH=repo_files
+#TITVO_SCAN_INFRASTRUCTURE=AWS
 ```
 
-El script realizará las siguientes acciones:
-1. Obtendrá el item de escaneo desde DynamoDB y actualizará su estado a `IN_PROGRESS`
-2. Detectará la fuente del escaneo (GitHub, Bitbucket o CLI)
-3. Descargará los archivos según el origen:
-   - En GitHub: Desde el commit especificado
-   - En Bitbucket: A partir del diff del commit
-   - En CLI: Desde archivos tar.gz en S3
-4. Enviará el código a Claude para su análisis
-5. Según el origen y el resultado:
-   - GitHub: Creará un issue si hay vulnerabilidades
-   - Bitbucket: Generará un reporte de código insights con las vulnerabilidades
-   - CLI: Generará un reporte HTML y lo subirá a S3
-6. Actualizará el estado en DynamoDB según el resultado
+## Configuración
 
-### Configuración de logging
+El proyecto utiliza AWS Parameter Store para su configuración:
 
-El nivel de log se puede ajustar mediante la variable de entorno `LOG_LEVEL`:
-- `DEBUG`: Muestra todos los mensajes, incluyendo información detallada útil para depuración.
-- `INFO`: Muestra mensajes informativos, de advertencia y errores (valor predeterminado).
-- `WARNING`: Solo muestra advertencias y errores.
-- `ERROR`: Solo muestra mensajes de error.
-- `CRITICAL`: Solo muestra errores críticos.
-
-Ejemplo:
-```bash
-LOG_LEVEL=DEBUG python main.py
-```
-
-### Integración con AWS
-
-#### DynamoDB
-
-El script utiliza DynamoDB para almacenar y actualizar el estado de los escaneos:
-
-- Tabla principal: Almacena los trabajos de escaneo y sus estados
-- Tabla de archivos CLI: Almacena metadatos de archivos enviados desde CLI
-
-#### Parameter Store
-
-El script obtiene configuración dinámica desde Parameter Store:
-
-- System prompt para Claude
-- Formatos de salida específicos para cada origen
-- Nombres de tablas DynamoDB
-- Nombres y dominios de buckets S3
-
-#### Secret Manager
-
-Se utilizan secretos de AWS Secret Manager para:
-
-- Credenciales de Bitbucket
-- Claves de cifrado para tokens
-
-#### S3
-
-Se utiliza S3 para:
-
-- Almacenar los archivos enviados desde CLI
-- Guardar los reportes HTML generados
-
-## Personalización
-
-El script utiliza dos prompts principales:
-
-- `system_prompt`: Define las instrucciones y comportamiento para Claude (obtenido desde Parameter Store)
-- `user_prompt`: Define la consulta específica con el código a analizar
-
-Ambos prompts pueden personalizarse a través de Parameter Store.
-
-## Formato de respuesta
-
-El análisis de seguridad se procesa según el origen:
-
-- GitHub: Se busca el patrón `[COMMIT_RECHAZADO]` para determinar si hay vulnerabilidades críticas
-- Bitbucket y CLI: Se buscan los patrones `CRITICAL` o `HIGH` en el análisis
-
-## Configuración avanzada
-
-El proyecto permite una gran flexibilidad a través de la configuración en Parameter Store:
-
-- `/tvo/security-scan/{stage}/github-security-scan/system-prompt`: Instrucciones para Claude
-- `/tvo/security-scan/{stage}/github-security-scan/output/{source}`: Formato de salida esperado según origen
-- `/tvo/security-scan/{stage}/task-trigger/dynamo-task-table-name`: Nombre de la tabla principal
-- `/tvo/security-scan/{stage}/github-security-scan/dynamo-client-file-table-name`: Nombre de la tabla de archivos CLI
+- `/tvo/security-scan/{stage}/github-security-scan/system-prompt`: Instrucciones para OpenAI
+- `/tvo/security-scan/{stage}/github-security-scan/output/{source}`: Formato de salida por origen
+- `/tvo/security-scan/{stage}/task-trigger/dynamo-task-table-name`: Tabla de tareas
+- `/tvo/security-scan/{stage}/github-security-scan/dynamo-client-file-table-name`: Tabla de archivos CLI
 - `/tvo/security-scan/{stage}/github-security-scan/s3-client-file-bucket-name`: Bucket para archivos CLI
 - `/tvo/security-scan/{stage}/github-security-scan/report-bucket-name`: Bucket para reportes
-- `/tvo/security-scan/{stage}/github-security-scan/report-bucket-domain`: Dominio para acceder a los reportes
-
-Donde `{stage}` puede ser `prod` o `dev`, según el entorno.
+- `/tvo/security-scan/{stage}/github-security-scan/report-bucket-domain`: Dominio para reportes
 
 ## Ejecución local usando Docker
 
-Crea un archivo `.env` con las variables de entorno necesarias:
-
 ```bash
-TITVO_SCAN_TASK_ID=tvo-scan-1234567890 # Necesario para obtener el item de escaneo desde DynamoDB
-AWS_REGION=us-east-1
-AWS_DEFAULT_REGION=us-east-1
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-LOG_LEVEL=INFO # Opcional, por defecto es INFO
+# Crear archivo .env con las variables necesarias descritas arriba
+docker build -t titvo-security-scan .
+docker run -it --rm --env-file .env titvo-security-scan
 ```
 
-```bash
-docker build -t deleteme .
-docker run -it --rm --env-file .env deleteme
-```
+## Formato de respuesta
+
+El análisis de seguridad varía según el origen:
+
+- **GitHub**: Se busca el patrón `[COMMIT_RECHAZADO]` para vulnerabilidades críticas
+- **Bitbucket y CLI**: Se buscan los patrones `CRITICAL` o `HIGH` en el análisis
+
+## Desarrollo
+
+Para contribuir al proyecto:
+
+1. Crea una rama para tu característica
+2. Implementa los cambios siguiendo la arquitectura hexagonal
+3. Añade pruebas unitarias y de integración
+4. Envía un pull request
