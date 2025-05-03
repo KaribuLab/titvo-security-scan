@@ -15,7 +15,6 @@ from titvo.infraestructure.file_fetchers.cli_file_fetcher_service import (
     CliFileFetcherService,
     CliFileFetcherServiceArgs,
 )
-from typing import List
 
 # Disable logging
 logging.getLogger("boto3").setLevel(logging.WARNING)
