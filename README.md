@@ -190,3 +190,7 @@ Para contribuir al proyecto:
 2. Implementa los cambios siguiendo la arquitectura hexagonal
 3. Añade pruebas unitarias y de integración
 4. Envía un pull request
+
+## Licencia
+
+Este proyecto está licenciado bajo la [Licencia Apache 2.0](LICENSE).
