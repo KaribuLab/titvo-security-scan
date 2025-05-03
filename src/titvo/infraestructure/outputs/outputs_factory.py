@@ -57,7 +57,7 @@ class OutputsServiceFactoryImpl(OutputServiceFactory):
             return CliOutputService(
                 args=CliOutputArgs(
                     batch_id=args["batch_id"],
-                    repository_url=args["repository_url"],
+                    repository_slug=args["repository_slug"],
                 ),
                 configuration_service=self.configuration_service,
                 storage_service=self.storage_service,

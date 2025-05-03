@@ -11,7 +11,7 @@ from titvo.infraestructure.outputs.html_report import create_issue_html
 @dataclass
 class CliOutputArgs:
     batch_id: str
-    repository_url: str
+    repository_slug: str
 
 
 @dataclass
