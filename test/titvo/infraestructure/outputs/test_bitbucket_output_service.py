@@ -211,6 +211,7 @@ def test_execute_create_report(
             upload_request.file_path
             == f"scm/{TaskSource.BITBUCKET.value}/scan/{scan_id}.html"
         )
+        assert upload_request.content_type == "text/html; charset=utf-8"
 
         # Verificar el resultado
         assert isinstance(result, BitbucketOutputResult)

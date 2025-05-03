@@ -17,6 +17,18 @@ class S3StorageService(StorageService):
         )
 
     def upload_file(self, request: UploadFileRequest) -> None:
-        return self.s3_client.upload_file(
-            request.input_path, request.container_name, request.file_path
-        )
+        # Usar el content_type proporcionado si existe
+        if request.content_type:
+            return self.s3_client.upload_file(
+                request.input_path, 
+                request.container_name, 
+                request.file_path,
+                ExtraArgs={'ContentType': request.content_type}
+            )
+        else:
+            # De lo contrario, usar el método estándar
+            return self.s3_client.upload_file(
+                request.input_path, 
+                request.container_name, 
+                request.file_path
+            )

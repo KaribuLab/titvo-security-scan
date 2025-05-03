@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class DownloadFileRequest:
@@ -13,6 +14,7 @@ class UploadFileRequest:
     container_name: str
     input_path: str
     file_path: str
+    content_type: Optional[str] = None
 
 
 class StorageService(ABC):

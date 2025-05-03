@@ -112,6 +112,7 @@ class BitbucketOutputService(OutputService):
                 container_name=report_container_name,
                 input_path=html_report_path,
                 file_path=report_path,
+                content_type="text/html; charset=utf-8",
             )
         )
         report_url = f"{report_domain}/{report_path}"

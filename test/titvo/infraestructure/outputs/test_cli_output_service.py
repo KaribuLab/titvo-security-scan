@@ -142,6 +142,7 @@ def test_execute(
             upload_request.file_path
             == f"scm/{TaskSource.CLI.value}/scan/{scan_id}.html"
         )
+        assert upload_request.content_type == "text/html; charset=utf-8"
 
         # Verificar el resultado
         assert isinstance(result, CliOutputResult)

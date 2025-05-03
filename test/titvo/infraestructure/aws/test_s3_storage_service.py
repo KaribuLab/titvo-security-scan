@@ -133,3 +133,40 @@ def test_download_nonexistent_file(s3_bucket):
         # Limpiar archivo temporal
         if os.path.exists(output_path):
             os.remove(output_path)
+
+
+@mock_aws
+def test_upload_file_with_content_type(s3_bucket):
+    """Test que verifica la carga de un archivo a S3 con content_type específico."""
+    # Preparar datos
+    bucket_name, s3_client = s3_bucket
+    os.makedirs("test-folder", exist_ok=True)
+    file_path = "test-folder/test-file.html"
+    file_content = "<html><body>Test content</body></html>"
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write(file_content)
+    
+    # Crear solicitud de carga con content_type
+    upload_request = UploadFileRequest(
+        container_name=bucket_name,
+        input_path=file_path,
+        file_path=file_path,
+        content_type="text/html; charset=utf-8",
+    )
+    
+    # Instanciar servicio
+    storage_service = S3StorageService()
+    
+    # Cargar archivo
+    storage_service.upload_file(upload_request)
+    
+    # Verificar que el archivo se cargó correctamente
+    response = s3_client.get_object(Bucket=bucket_name, Key=file_path)
+    retrieved_content = response["Body"].read().decode("utf-8")
+    
+    # Verificar el content-type
+    assert response["ContentType"] == "text/html; charset=utf-8"
+    assert retrieved_content == file_content
+    
+    os.remove(file_path)
+    os.rmdir("test-folder")
