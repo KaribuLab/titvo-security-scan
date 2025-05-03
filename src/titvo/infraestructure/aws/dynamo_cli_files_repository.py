@@ -22,9 +22,9 @@ class DynamoCliFilesRepository(CliFilesRepository):
             json_item = json.loads(item)
             cli_files.append(
                 CliFiles(
-                    batch_id=json_item["batch_id"],
-                    file_key=json_item["file_key"],
-                    ttl=json_item["ttl"],
+                    batch_id=json_item.get("batch_id", ""),
+                    file_key=json_item.get("file_key", ""),
+                    ttl=json_item.get("ttl", 0),
                 )
             )
         return cli_files
