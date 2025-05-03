@@ -28,6 +28,7 @@ logging.getLogger("botocore").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logging.basicConfig(level=os.getenv("TITVO_LOG_LEVEL", "INFO"))
 

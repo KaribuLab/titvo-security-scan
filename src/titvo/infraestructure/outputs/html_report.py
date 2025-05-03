@@ -17,7 +17,7 @@ def create_issue_html(scan_result: ScanResult, template_path: str, template_name
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
 
     for issue in issues:
-        severity = issue.get("severity", "").lower()
+        severity = issue.severity.lower()
         if severity in severity_counts:
             severity_counts[severity] += 1
 
@@ -25,7 +25,6 @@ def create_issue_html(scan_result: ScanResult, template_path: str, template_name
     html_content = template.render(
         scan_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         total_issues=total_issues,
-        recommendation=scan_result.recommendation,
         critical_issues=severity_counts["critical"],
         high_issues=severity_counts["high"],
         medium_issues=severity_counts["medium"],

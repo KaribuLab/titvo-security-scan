@@ -155,6 +155,81 @@
             background-color: #e6f4ea;
             color: var(--titvo-success);
         }
+
+        /* Estilos para los botones de feedback */
+        .feedback-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .feedback-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            font-weight: 500;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-correct {
+            background-color: var(--titvo-success);
+            color: white;
+        }
+
+        .btn-incorrect {
+            background-color: var(--titvo-danger);
+            color: white;
+        }
+
+        .feedback-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .feedback-btn:active {
+            transform: translateY(0);
+        }
+
+        .feedback-selected {
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
+        }
+
+        /* Estilo para botones deshabilitados */
+        .feedback-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .feedback-btn:disabled.feedback-selected {
+            opacity: 0.8;
+        }
+
+        /* Toast de notificación */
+        .toast {
+            visibility: hidden;
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--titvo-dark);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 999;
+            font-size: 0.9em;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -165,12 +240,6 @@
                 alt="Logo Titvo">
         </h1>
         <h1>Reporte de Análisis de Seguridad</h1>
-        {% if workspace and repo_slug %}
-        <p>Repositorio: {{ workspace }}/{{ repo_slug }}</p>
-        {% endif %}
-        {% if commit_sha %}
-        <p>Commit: {{ commit_sha }}</p>
-        {% endif %}
         <p>Fecha de Análisis: {{ scan_date }}</p>
     </div>
 
@@ -212,8 +281,63 @@
         <p><strong>Resumen:</strong></p>
         <p>{{ issue.summary }}</p>
         {% endif %}
+        
+        <!-- Botones de feedback -->
+        <div class="feedback-buttons">
+            <span><strong>¿Es correcto?</strong></span>
+            <button class="feedback-btn btn-correct" onclick="provideFeedback(this, '{{ loop.index }}', true)">
+                ✓ Sí
+            </button>
+            <button class="feedback-btn btn-incorrect" onclick="provideFeedback(this, '{{ loop.index }}', false)">
+                ✗ No
+            </button>
+        </div>
     </div>
     {% endfor %}
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        function provideFeedback(button, issueId, isCorrect) {
+            // Obtener todos los botones del mismo grupo
+            const parentButtons = button.parentElement.querySelectorAll('.feedback-btn');
+            
+            // Desseleccionar todos los botones
+            parentButtons.forEach(btn => {
+                btn.classList.remove('feedback-selected');
+                // Deshabilitar todos los botones
+                btn.disabled = true;
+            });
+            
+            // Seleccionar solo el botón actual
+            button.classList.add('feedback-selected');
+            
+            // Enviar feedback al servidor (simulado)
+            sendIssueFeedback(issueId, isCorrect);
+            
+            // Mostrar toast de confirmación
+            showToast(`Feedback enviado para el issue #${issueId}`);
+        }
+
+        function sendIssueFeedback(issueId, isCorrect) {
+            // Este método puede ser llamado desde otro lugar para enviar feedback
+            console.log(`Issue #${issueId} marcado como ${isCorrect ? 'correcto' : 'incorrecto'}`);
+            
+            // Simulación de envío a servidor
+            // En un caso real, aquí harías una petición fetch() o XMLHttpRequest
+            return true; // Retorna true si todo salió bien
+        }
+
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+    </script>
 </body>
 
 </html>

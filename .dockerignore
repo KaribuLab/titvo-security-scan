@@ -10,3 +10,5 @@ README.md
 serverless.hcl
 terragrunt.hcl
 repo_files
+templates
+docs

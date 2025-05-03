@@ -25,3 +25,6 @@ build/
 repo_files/
 
 *.log
+
+templates/*.html
+!templates/report_template.html

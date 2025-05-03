@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 import json
 import uuid
 import os
@@ -9,6 +10,8 @@ from titvo.core.ports.storage_service import StorageService, UploadFileRequest
 from titvo.app.scan.scan_entities import ScanResult, ScanStatus
 from titvo.app.task.task_entities import TaskSource
 from titvo.infraestructure.outputs.html_report import create_issue_html
+
+LOGGER = logging.getLogger(__name__)
 
 ACCESS_TOKEN_URL = "https://bitbucket.org/site/oauth2/access_token"
 BITBUCKET_API_URL = "https://api.bitbucket.org/2.0"
@@ -117,7 +120,7 @@ class BitbucketOutputService(OutputService):
             "details": "Security scan report",
             "report_type": "SECURITY",
             "reporter": "titvo-security-scan",
-            "result": scan_result.status,
+            "result": scan_result.status.value,
             "data": [
                 {
                     "title": "Safe to merge?",
@@ -139,7 +142,13 @@ class BitbucketOutputService(OutputService):
         response = requests.put(
             create_report_url, headers=headers, json=payload, timeout=30
         )
-        response.raise_for_status()
+        if response.status_code == 400:
+            LOGGER.warning("Report already exists")
+            LOGGER.debug("Report: %s", response.json())
+            return BitbucketOutputResult(report_url=report_url)
+        else:
+            response.raise_for_status()
+        LOGGER.debug("Report created: %s", response.json())
         payload = [
             {
                 "external_id": f"{report_id}-annotation-{uuid.uuid4()}",
@@ -147,6 +156,7 @@ class BitbucketOutputService(OutputService):
                 "title": item.title,
                 "description": item.description,
                 "severity": item.severity,
+                "summary": item.summary,
                 "path": item.path,
                 "line": item.line,
             }
@@ -158,4 +168,10 @@ class BitbucketOutputService(OutputService):
             json=payload,
             timeout=30,
         )
+        LOGGER.debug("Annotations created: %s", response.json())
+        if response.status_code == 400:
+            LOGGER.warning("Annotations error: %s", response.json())
+            return BitbucketOutputResult(report_url=report_url)
+        else:
+            response.raise_for_status()
         return BitbucketOutputResult(report_url=report_url)
