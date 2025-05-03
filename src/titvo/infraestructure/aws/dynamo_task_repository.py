@@ -27,15 +27,15 @@ class DynamoTaskRepository(TaskRepository):
             updated_at = datetime.fromisoformat(updated_at)
         LOGGER.debug("Item: %s", item)
         return Task(
-            id=item["scan_id"],
+            id=item.get("scan_id", ""),
             result=item.get("result", {}),
             args=item.get("args", {}),
-            hint_id=item["repository_id"],
-            scaned_files=item["scaned_files"],
+            hint_id=item.get("repository_id", ""),
+            scaned_files=item.get("scaned_files", 0),
             created_at=created_at,
             updated_at=updated_at,
-            status=TaskStatus(item["status"]),
-            source=TaskSource(item["source"]),
+            status=TaskStatus(item.get("status", TaskStatus.PENDING.value)),
+            source=TaskSource(item.get("source", TaskSource.GITHUB.value)),
         )
 
     def update_task(self, task: Task) -> Task:
