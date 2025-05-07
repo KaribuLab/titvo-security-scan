@@ -2,6 +2,16 @@
 <html lang="es">
 
 <head>
+    <!-- Google Tag Manager -->
+    <script>(function (w, d, s, l, i) {
+            w[l] = w[l] || []; w[l].push({
+                'gtm.start':
+                    new Date().getTime(), event: 'gtm.js'
+            }); var f = d.getElementsByTagName(s)[0],
+                j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                    'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+        })(window, document, 'script', 'dataLayer', 'GTM-M77B8PV6');</script>
+    <!-- End Google Tag Manager -->
     <title>Reporte de Análisis de Seguridad Titvo</title>
     <link href="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048231170ce0ffdf1650015_fav-icon.png"
         rel="shortcut icon" type="image/x-icon">
@@ -234,6 +244,10 @@
 </head>
 
 <body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M77B8PV6" height="0" width="0"
+            style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
     <div class="header">
         <h1>
             <img src="https://cdn.prod.website-files.com/603dfe33e1a2669e0384eaf6/6048081cbb0b106db5539f7e_Titvologo.png"
@@ -281,7 +295,7 @@
         <p><strong>Resumen:</strong></p>
         <p>{{ issue.summary }}</p>
         {% endif %}
-        
+
         <!-- Botones de feedback -->
         <div class="feedback-buttons">
             <span><strong>¿Es correcto?</strong></span>
@@ -301,20 +315,20 @@
         function provideFeedback(button, issueId, isCorrect) {
             // Obtener todos los botones del mismo grupo
             const parentButtons = button.parentElement.querySelectorAll('.feedback-btn');
-            
+
             // Desseleccionar todos los botones
             parentButtons.forEach(btn => {
                 btn.classList.remove('feedback-selected');
                 // Deshabilitar todos los botones
                 btn.disabled = true;
             });
-            
+
             // Seleccionar solo el botón actual
             button.classList.add('feedback-selected');
-            
+
             // Enviar feedback al servidor (simulado)
             sendIssueFeedback(issueId, isCorrect);
-            
+
             // Mostrar toast de confirmación
             showToast(`Feedback enviado para el issue #${issueId}`);
         }
@@ -322,7 +336,7 @@
         function sendIssueFeedback(issueId, isCorrect) {
             // Este método puede ser llamado desde otro lugar para enviar feedback
             console.log(`Issue #${issueId} marcado como ${isCorrect ? 'correcto' : 'incorrecto'}`);
-            
+
             // Simulación de envío a servidor
             // En un caso real, aquí harías una petición fetch() o XMLHttpRequest
             return true; // Retorna true si todo salió bien
@@ -332,7 +346,7 @@
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.classList.add('show');
-            
+
             setTimeout(() => {
                 toast.classList.remove('show');
             }, duration);
