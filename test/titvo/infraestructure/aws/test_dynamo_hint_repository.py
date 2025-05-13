@@ -52,7 +52,7 @@ def test_get_hint(dynamodb_table, sample_hint):
         "repository_id": sample_hint.id,
         "repository_name": sample_hint.name,
         "repository_slug": sample_hint.slug,
-        "hint": sample_hint.content,
+        "repository_hint": sample_hint.content,
     }
 
     table.put_item(Item=hint_dict)

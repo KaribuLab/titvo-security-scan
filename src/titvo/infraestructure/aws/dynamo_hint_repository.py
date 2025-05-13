@@ -21,5 +21,5 @@ class DynamoHintRepository(HintRepository):
             id=item["repository_id"],
             name=item["repository_name"],
             slug=item["repository_slug"],
-            content=item["hint"],
+            content=item["repository_hint"],
         )
