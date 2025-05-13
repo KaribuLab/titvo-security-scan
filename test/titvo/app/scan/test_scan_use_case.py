@@ -40,7 +40,6 @@ def test_run_scan_use_case():
         id="hint123",
         name="hint123",
         slug="hint123",
-        url="hint123",
         content="Este es un hint de prueba",
     )
 
@@ -156,7 +155,6 @@ def test_run_scan_use_case_with_error():
         id="hint123",
         name="hint123",
         slug="hint123",
-        url="hint123",
         content="Este es un hint de prueba",
     )
 

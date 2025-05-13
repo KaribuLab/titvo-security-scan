@@ -37,7 +37,6 @@ def sample_hint():
         id="hint-123",
         name="Test Hint",
         slug="test-hint",
-        url="https://example.com/hints/test-hint",
         content="Este es un hint de prueba para análisis de seguridad",
     )
 
@@ -51,10 +50,8 @@ def test_get_hint(dynamodb_table, sample_hint):
     # Convertir el hint a formato DynamoDB y almacenarlo
     hint_dict = {
         "repository_id": sample_hint.id,
-        "hint_id": sample_hint.id,
-        "name": sample_hint.name,
-        "slug": sample_hint.slug,
-        "url": sample_hint.url,
+        "repository_name": sample_hint.name,
+        "repository_slug": sample_hint.slug,
         "hint": sample_hint.content,
     }
 
@@ -70,7 +67,6 @@ def test_get_hint(dynamodb_table, sample_hint):
     assert retrieved_hint.id == sample_hint.id
     assert retrieved_hint.name == sample_hint.name
     assert retrieved_hint.slug == sample_hint.slug
-    assert retrieved_hint.url == sample_hint.url
     assert retrieved_hint.content == sample_hint.content
 
 

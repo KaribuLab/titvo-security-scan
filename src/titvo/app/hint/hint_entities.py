@@ -6,5 +6,4 @@ class Hint:
     id: str
     name: str
     slug: str
-    url: str
     content: str
