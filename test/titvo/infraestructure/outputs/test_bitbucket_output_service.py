@@ -158,21 +158,23 @@ def test_execute_create_report(
         payload = kwargs["json"]
         assert payload["title"] == "Titvo Security Scan"
         assert payload["report_type"] == "SECURITY"
-        assert payload["result"] == sample_scan_result.status
+        assert payload["result"] == sample_scan_result.status.value
 
         # Verificar la creación de anotaciones
-        mock_requests.post.assert_any_call(
-            mock_requests.put.call_args[0][0] + "/annotations",
+        annotations_url = mock_requests.put.call_args[0][0] + "/annotations"
+        mock_requests.post.assert_called_with(
+            annotations_url,
             headers=kwargs["headers"],
             json=[
                 {
-                    "external_id": mock_requests.post.call_args[1]["json"][0][
+                    "external_id": mock_requests.post.call_args_list[1][1]["json"][0][
                         "external_id"
                     ],
                     "annotation_type": "VULNERABILITY",
                     "title": "Ejecución de código arbitrario",
                     "description": "La función eval puede ejecutar código arbitrario",
                     "severity": "CRITICAL",
+                    "summary": "Uso de eval con entrada no sanitizada",
                     "path": "app/main.py",
                     "line": 10,
                 }
@@ -347,7 +349,7 @@ def test_execute_multiple_annotations(
         service.execute(scan_result)
 
         # Verificar que se crearon anotaciones para ambos problemas
-        annotations = mock_requests.post.call_args[1]["json"]
+        annotations = mock_requests.post.call_args_list[1][1]["json"]
         assert len(annotations) == 2
         assert annotations[0]["title"] == "Ejecución de código arbitrario"
         assert annotations[0]["severity"] == "CRITICAL"

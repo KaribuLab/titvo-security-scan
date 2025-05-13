@@ -28,7 +28,7 @@ class DynamoTaskRepository(TaskRepository):
         LOGGER.debug("Item: %s", item)
         return Task(
             id=item.get("scan_id", ""),
-            result=item.get("result", {}),
+            result=item.get("scan_result", {}),
             args=item.get("args", {}),
             hint_id=item.get("repository_id", ""),
             scaned_files=item.get("scaned_files", 0),

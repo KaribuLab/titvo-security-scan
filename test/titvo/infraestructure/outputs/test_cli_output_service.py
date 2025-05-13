@@ -78,7 +78,7 @@ def cli_args():
     """Fixture que crea argumentos para el CliOutputService."""
     return CliOutputArgs(
         batch_id="test-batch-123",
-        repository_url="https://github.com/test/repo"
+        repository_slug="test/repo",
     )
 
 

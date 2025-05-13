@@ -18,7 +18,7 @@ class DynamoHintRepository(HintRepository):
             return None
         item = json.loads(response["Item"])
         return Hint(
-            id=item["hint_id"],
+            id=item["repository_id"],
             name=item["name"],
             slug=item["slug"],
             url=item["url"],
