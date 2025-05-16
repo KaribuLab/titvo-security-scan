@@ -188,10 +188,14 @@ Opcionalmente se puede crear un archivo common_tags.json con las etiquetas neces
   ```
   > [!IMPORTANT]
   > `PROJECT_NAME` y `PARAMETER_PATH`deben tener los mismos valores que se usarion en el proyecto [titvo-security-scan-infra-aws](https://github.com/KaribuLab/titvo-security-scan-infra-aws)
-2. Desplegar el proyecto
+2. Crear infraestructura
   ```bash
   cd aws
   terragrunt run-all apply --auto-approve
+  ```
+3. Publicar imagen en ECR
+  ```bash
+  ./docker_push.sh
   ```
 
 ## Formato de respuesta

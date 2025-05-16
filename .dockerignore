@@ -12,3 +12,8 @@ terragrunt.hcl
 repo_files
 templates
 docs
+.pytest_cache
+pytest.ini
+requirements-dev.txt
+common-tags.json
+LICENSE
