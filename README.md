@@ -191,7 +191,7 @@ Opcionalmente se puede crear un archivo common_tags.json con las etiquetas neces
 2. Crear infraestructura
   ```bash
   cd aws
-  terragrunt run-all apply --auto-approve
+  terragrunt run-all apply --terragrunt-non-interactive --auto-approve
   ```
 3. Publicar imagen en ECR
   ```bash
