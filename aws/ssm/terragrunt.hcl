@@ -10,6 +10,10 @@ locals {
 
 dependency "batch" {
   config_path = "${get_parent_terragrunt_dir()}/aws/batch"
+  mock_outputs = {
+    job_definition_arn = "arn:aws:batch:us-east-1:012345678901:job-definition/security-scan-batch-arn"
+    job_queue_arn      = "arn:aws:batch:us-east-1:012345678901:job-queue/security-scan-job-queue-arn"
+  }
 }
 
 include {
