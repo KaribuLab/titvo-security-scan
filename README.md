@@ -112,8 +112,8 @@ El proyecto incluye pruebas unitarias e integración usando pytest y moto:
 
 1. Clona este repositorio:
 ```bash
-git clone https://github.com/tu-usuario/github-security-scan.git
-cd github-security-scan
+git clone https://github.com/KaribuLab/titvo-security-scan.git
+cd titvo-security-scan
 ```
 
 2. Instala las dependencias:
@@ -156,18 +156,6 @@ TITVO_LOG_LEVEL=INFO
 #TITVO_SCAN_INFRASTRUCTURE=AWS
 ```
 
-## Configuración
-
-El proyecto utiliza AWS Parameter Store para su configuración:
-
-- `/tvo/security-scan/{stage}/github-security-scan/system-prompt`: Instrucciones para OpenAI
-- `/tvo/security-scan/{stage}/github-security-scan/output/{source}`: Formato de salida por origen
-- `/tvo/security-scan/{stage}/task-trigger/dynamo-task-table-name`: Tabla de tareas
-- `/tvo/security-scan/{stage}/github-security-scan/dynamo-client-file-table-name`: Tabla de archivos CLI
-- `/tvo/security-scan/{stage}/github-security-scan/s3-client-file-bucket-name`: Bucket para archivos CLI
-- `/tvo/security-scan/{stage}/github-security-scan/report-bucket-name`: Bucket para reportes
-- `/tvo/security-scan/{stage}/github-security-scan/report-bucket-domain`: Dominio para reportes
-
 ## Ejecución local usando Docker
 
 ```bash
@@ -175,6 +163,36 @@ El proyecto utiliza AWS Parameter Store para su configuración:
 docker build -t titvo-security-scan .
 docker run -it --rm --env-file .env titvo-security-scan
 ```
+
+## Despliegue
+
+Opcionalmente se puede crear un archivo common_tags.json con las etiquetas necesarias:
+
+```json
+{
+  "Project": "Titvo Security Scan",
+  "Customer": "Titvo",
+  "Team": "Area Creacion"
+}
+```
+
+1. Crear archivo .env con las variables necesarias descritas arriba
+  ```bash
+  export AWS_ACCESS_KEY_ID="tu_access_key"
+  export AWS_SECRET_ACCESS_KEY="tu_secret_key"
+  export AWS_DEFAULT_REGION="us-east-1"
+  export AWS_STAGE="prod"
+  export PROJECT_NAME="titvo-security-scan" # Opcional si quiere mantener los valores por defecto. Esto se usará como prefijo para los recursos
+  export PARAMETER_PATH="/titvo/security-scan" # Opcional si quiere mantener los valores por defecto. Esto se usará como prefijo para los parámetros
+  export BUCKET_STATE_NAME="titvo-security-scan-terraform-state" # Opcional, si no se especifica se usará el nombre del proyecto. Por ejemplo: titvo-security-scan-terraform-state
+  ```
+  > [!IMPORTANT]
+  > `PROJECT_NAME` y `PARAMETER_PATH`deben tener los mismos valores que se usarion en el proyecto [titvo-security-scan-infra-aws](https://github.com/KaribuLab/titvo-security-scan-infra-aws)
+2. Desplegar el proyecto
+  ```bash
+  cd aws
+  terragrunt run-all apply --auto-approve
+  ```
 
 ## Formato de respuesta
 
