@@ -88,16 +88,6 @@ inputs = {
       {
         "Effect" : "Allow",
         "Action" : [
-          "ssm:GetParameter",
-        ],
-        "Resource" : [
-          "arn:aws:ssm:*:*:parameter${local.base_path}/task-trigger*",
-          "arn:aws:ssm:*:*:parameter${local.base_path}/github-security-scan*",
-        ]
-      },
-      {
-        "Effect" : "Allow",
-        "Action" : [
           "dynamodb:GetItem",
           "dynamodb:UpdateItem",
         ],
