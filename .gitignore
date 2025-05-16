@@ -28,3 +28,8 @@ repo_files/
 
 templates/*.html
 !templates/report_template.html
+
+common_tags.json
+
+.terragrunt-cache/
+.terraform.lock.hcl
