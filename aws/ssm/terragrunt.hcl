@@ -27,7 +27,7 @@ inputs = {
     {
       name  = "security-scan-batch-arn"
       type  = "String"
-      value = dependency.batch.outputs.job_definition_arn
+      value = join(":", slice(split(":", dependency.batch.outputs.job_definition_arn), 0, length(split(":", dependency.batch.outputs.job_definition_arn)) - 1))
     },
     {
       name  = "security-scan-job-queue-arn"
