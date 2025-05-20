@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import List
 from dataclasses import dataclass
 import json
@@ -9,6 +10,7 @@ from titvo.core.ports.file_fetcher_service import FileFetcherService
 ACCESS_TOKEN_URL = "https://bitbucket.org/site/oauth2/access_token"
 BITBUCKET_API_URL = "https://api.bitbucket.org/2.0"
 
+LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class BitbucketFileFetcherServiceArgs:
@@ -72,7 +74,7 @@ class BitbucketFileFetcherService(FileFetcherService):
         for line in diff_content.split("\n"):
             if line.startswith("diff --git"):
                 file_path = line.split(" b/")[1]
-                files.append(file_path)
+                LOGGER.info("Fetching file: %s", file_path)
                 content_url = (
                     f"{BITBUCKET_API_URL}/repositories/{self.args.bitbucket_workspace}/"
                     f"{self.args.bitbucket_repo_slug}/src/{commit_hash}/{file_path}"
@@ -85,4 +87,5 @@ class BitbucketFileFetcherService(FileFetcherService):
                     os.makedirs(dirname, exist_ok=True)
                 with open(full_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
+                files.append(file_path)
         return files
