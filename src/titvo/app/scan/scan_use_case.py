@@ -1,5 +1,5 @@
 import os
-import string
+import mimetypes
 import logging
 from typing import List
 from titvo.app.task.task_use_case import (
@@ -21,13 +21,7 @@ from titvo.app.scan.scan_entities import Prompt
 
 LOGGER = logging.getLogger(__name__)
 
-def is_binary(filepath, threshold=0.30):
-    with open(filepath, 'rb') as f:
-        chunk = f.read(1024)
-    if not chunk:
-        return False
-    readable_chars = sum(byte in b'\n\r\t\f\b' + bytes(string.printable, 'ascii') for byte in chunk)
-    return (readable_chars / len(chunk)) < threshold
+
 
 
 class RunScanUseCase:
@@ -74,7 +68,7 @@ class RunScanUseCase:
             for file in files:
                 LOGGER.info("File: %s", file)
                 repo_file_path = os.path.join(self.repo_files_path, file)
-                if is_binary(repo_file_path):
+                if mimetypes.guess_type(repo_file_path)[0] is None:
                     LOGGER.warning("File is binary: %s", file)
                     continue
                 with open(repo_file_path, "r", encoding="utf-8") as f:
