@@ -72,6 +72,14 @@ class RunScanUseCase:
                     or mimetypes.guess_type(repo_file_path)[0] == "image/jpeg"
                     or mimetypes.guess_type(repo_file_path)[0] == "image/gif"
                     or mimetypes.guess_type(repo_file_path)[0] == "image/webp"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/vnd.ms-excel"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/pdf"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/msword"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/vnd.ms-powerpoint"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    or mimetypes.guess_type(repo_file_path)[0] == "application/vnd.ms-excel.sheet.macroEnabled.12"
                 ):
                     LOGGER.warning("File is binary: %s", file)
                     continue
