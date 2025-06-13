@@ -22,8 +22,6 @@ from titvo.app.scan.scan_entities import Prompt
 LOGGER = logging.getLogger(__name__)
 
 
-
-
 class RunScanUseCase:
     def __init__(
         self,
@@ -68,7 +66,13 @@ class RunScanUseCase:
             for file in files:
                 LOGGER.info("File: %s", file)
                 repo_file_path = os.path.join(self.repo_files_path, file)
-                if mimetypes.guess_type(repo_file_path)[0] is None:
+                # Check if file is binary
+                if (
+                    mimetypes.guess_type(repo_file_path)[0] == "image/png"
+                    or mimetypes.guess_type(repo_file_path)[0] == "image/jpeg"
+                    or mimetypes.guess_type(repo_file_path)[0] == "image/gif"
+                    or mimetypes.guess_type(repo_file_path)[0] == "image/webp"
+                ):
                     LOGGER.warning("File is binary: %s", file)
                     continue
                 with open(repo_file_path, "r", encoding="utf-8") as f:
