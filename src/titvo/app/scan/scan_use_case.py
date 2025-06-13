@@ -67,7 +67,7 @@ class RunScanUseCase:
                 repo_file_path = os.path.join(self.repo_files_path, file)
                 # Check if file is binary by extension
                 if file.endswith(
-                    (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",".ico")
+                    (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico", ".svg")
                 ) or file.endswith(
                     (".xlsx", ".xls", ".docx", ".doc", ".pptx", ".ppt", ".pdf")
                 ):
