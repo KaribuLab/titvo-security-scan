@@ -25,8 +25,8 @@ def is_binary(filepath, threshold=0.30):
     with open(filepath, 'rb') as f:
         chunk = f.read(1024)
     if not chunk:
-        return False  # Vacío → lo tratamos como texto
-    readable_chars = sum(c in bytes(string.printable, 'ascii') for c in chunk)
+        return False
+    readable_chars = sum(byte in b'\n\r\t\f\b' + bytes(string.printable, 'ascii') for byte in chunk)
     return (readable_chars / len(chunk)) < threshold
 
 
