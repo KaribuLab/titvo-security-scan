@@ -22,7 +22,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4.1.0
         with:
           audience: sts.amazonaws.com
-          role-to-assume: arn:aws:iam::601238391153:role/karibulabs-github-actions-batch-role
+          role-to-assume: ${{ secrets.AWS_BATCH_ROLE_TO_ASSUME }}
           role-session-name: karibulabs-github-actions-batch-session
           aws-region: ${{ secrets.AWS_REGION }}
 
