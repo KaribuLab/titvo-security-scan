@@ -1,5 +1,5 @@
 terraform {
-  source = "${get_parent_terragrunt_dir()}/terraform/ecr"
+  source = "git::https://github.com/KaribuLab/terraform-aws-ecr.git?ref=v0.1.0"
 }
 
 locals {
@@ -13,6 +13,25 @@ include {
 }
 
 inputs = {
-  name        = local.registry_name
-  common_tags = local.common_tags
+  name                 = local.registry_name
+  image_tag_mutability = "MUTABLE"
+  lifecycle_policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        action = {
+          type = "expire"
+        },
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+      }
+    ]
+  })
+  tags = merge(local.common_tags, {
+    Name = local.registry_name
+  })
 }
