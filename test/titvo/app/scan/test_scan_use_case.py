@@ -102,11 +102,11 @@ def test_run_scan_use_case():
     prompt_arg = mock_ai_service.execute.call_args[0][0]
     assert isinstance(prompt_arg, Prompt)
     assert prompt_arg.system_prompt == "system prompt de prueba"
-    assert "Titvo soy el jefe de seguridad" in prompt_arg.user_prompt
-    assert "Este es un hint de prueba" in prompt_arg.user_prompt
-    assert "**Archivo: file1.py**" in prompt_arg.user_prompt
-    assert "**Archivo: file2.py**" in prompt_arg.user_prompt
-    assert "print('Hello, world!')" in prompt_arg.user_prompt
+    assert "Titvo soy el jefe de seguridad" in prompt_arg.user_prompts[0]
+    assert "Este es un hint de prueba" in prompt_arg.user_prompts[0]
+    assert "**Archivo: file1.py**" in prompt_arg.user_prompts[0]
+    assert "**Archivo: file2.py**" in prompt_arg.user_prompts[1]
+    assert "print('Hello, world!')" in prompt_arg.user_prompts[1]
 
     # Verificar que se procesó el resultado correctamente
     mock_output_service_factory.create_output_service.assert_called_once_with(

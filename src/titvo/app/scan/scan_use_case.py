@@ -61,7 +61,7 @@ class RunScanUseCase:
                 )
             )
             files: List[str] = file_fetcher_service.fetch_files()
-            files_code = ""
+            user_prompts = []
             for file in files:
                 LOGGER.info("File: %s", file)
                 repo_file_path = os.path.join(self.repo_files_path, file)
@@ -75,27 +75,29 @@ class RunScanUseCase:
                     continue
                 with open(repo_file_path, "r", encoding="utf-8") as f:
                     file_content = f.read()
+                    file_code = f"\n\n**Archivo: {file}**\n```\n{file_content}\n```"
+                    user_prompt = ""
+                    if hint is not None:
+                        user_prompt += f"""
+        Titvo soy el jefe de seguridad. A continuación comenzaré a darte una lista de sugerencias para que las uses en tu análisis:
+        ==================================
+        {hint.content}
+        ==================================
+        Fin de las sugerencias.
+        """
 
-                files_code += f"\n\n**Archivo: {file}**\n```\n{file_content}\n```"
-            LOGGER.debug("Files code: %s", files_code)
-            user_prompt = ""
-            if hint is not None:
-                user_prompt += f"""
-Titvo soy el jefe de seguridad. A continuación comenzaré a darte una lista de sugerencias para que las uses en tu análisis:
-==================================
-{hint.content}
-==================================
-Fin de las sugerencias.
-"""
+                    user_prompt += f"""
+        A continuación te voy a dar el código del archivo que vas a analizar:
+        ==================================
+        {file_code}
+        ==================================
+        Fin del código del archivo.
+        **Solo puedes entregar un hallazgo por archivo.**
+        """
+                    LOGGER.debug("File code: %s", file_code)
+                    user_prompts.append(user_prompt)
 
-            user_prompt += f"""
-A continuación te voy a dar una lista de archivos que vas a analizar:
-==================================
-{files_code}
-==================================
-Fin de la lista de archivos.
-"""
-            prompt = Prompt(system_prompt, user_prompt)
+            prompt = Prompt(system_prompt, user_prompts)
             ai_result = self.ai_service.execute(prompt)
             output_service = self.output_service_factory.create_output_service(
                 args=task.args,

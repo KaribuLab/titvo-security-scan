@@ -1,4 +1,5 @@
 import logging
+import os
 import base64
 from unittest.mock import patch
 import boto3
@@ -17,6 +18,8 @@ logging.getLogger("moto").setLevel(logging.WARNING)
 
 # pylint: disable=redefined-outer-name
 
+os.environ["AWS_REGION"] = "us-east-1"
+os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 
 @pytest.fixture
 def dynamodb_table():

@@ -16,7 +16,7 @@ class Scan:
 @dataclass
 class Prompt:
     system_prompt: str
-    user_prompt: str
+    user_prompts: list[str]
 
 
 @dataclass
