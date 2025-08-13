@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -14,6 +18,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.1.0
+        with:
+          audience: sts.amazonaws.com
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_BATCH_ROLE_TO_ASSUME }}
+          role-session-name: karibulabs-github-actions-batch-session
+
       - name: Apply Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
         with:
@@ -22,8 +34,6 @@ jobs:
           tg_dir: "aws"
           tg_command: "run-all apply --terragrunt-non-interactive -auto-approve"
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_STAGE: "prod"
 
@@ -36,8 +46,6 @@ jobs:
           tg_dir: "aws/ecr"
           tg_command: "output -raw ecr_repository_url"
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_STAGE: "prod"
 
@@ -45,8 +53,6 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ steps.ecr-url.outputs.tg_action_output }}
-          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
