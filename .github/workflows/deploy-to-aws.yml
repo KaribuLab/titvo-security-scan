@@ -22,9 +22,9 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4.1.0
         with:
           audience: sts.amazonaws.com
-          aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_BATCH_ROLE_TO_ASSUME }}
           role-session-name: karibulabs-github-actions-batch-session
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Apply Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
