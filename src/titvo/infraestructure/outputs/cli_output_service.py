@@ -17,10 +17,12 @@ class CliOutputArgs:
 @dataclass
 class CliOutputResult(OutputResult):
     report_url: str
+    result: ScanResult
 
     def to_dict(self) -> dict:
         return {
             "report_url": self.report_url,
+            "result": self.result.to_dict(),
         }
 
 
@@ -75,4 +77,5 @@ class CliOutputService(OutputService):
         report_url = f"{report_domain}/{report_path}"
         return CliOutputResult(
             report_url=report_url,
+            result=scan_result,
         )

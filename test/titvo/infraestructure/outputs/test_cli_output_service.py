@@ -150,9 +150,16 @@ def test_execute(
             result.report_url
             == f"https://example.com/scm/{TaskSource.CLI.value}/scan/{scan_id}.html"
         )
-        assert result.to_dict() == {
-            "report_url": f"https://example.com/scm/{TaskSource.CLI.value}/scan/{scan_id}.html"
-        }
+        assert result.result == sample_scan_result
+        
+        # Verificar el diccionario completo
+        result_dict = result.to_dict()
+        assert result_dict["report_url"] == f"https://example.com/scm/{TaskSource.CLI.value}/scan/{scan_id}.html"
+        assert result_dict["result"]["status"] == "FAILED"
+        assert result_dict["result"]["number_of_issues"] == 1
+        assert len(result_dict["result"]["annotations"]) == 1
+        assert result_dict["result"]["annotations"][0]["title"] == "Ejecución de código arbitrario"
+        assert result_dict["result"]["annotations"][0]["severity"] == "CRITICAL"
 
 
 def test_execute_with_different_source(

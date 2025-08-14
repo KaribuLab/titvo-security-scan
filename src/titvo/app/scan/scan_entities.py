@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from enum import Enum
 from typing import List
 
@@ -30,9 +30,19 @@ class Annotation:
     code: str
     recommendation: str
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
 
 @dataclass
 class ScanResult:
     status: ScanStatus
     number_of_issues: int
     annotations: List[Annotation]
+
+    def to_dict(self) -> dict:
+        return {
+            'status': self.status.value,
+            'number_of_issues': self.number_of_issues,
+            'annotations': [annotation.to_dict() for annotation in self.annotations]
+        }
