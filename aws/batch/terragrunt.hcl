@@ -99,6 +99,10 @@ inputs = {
     {
       name  = "TITVO_ENCRYPTION_KEY_NAME"
       value = dependency.parameters.outputs.parameters["${local.base_path}/infra/encryption-key-name"]
+    },
+    {
+      name  = "TITVO_LOG_LEVEL"
+      value = "DEBUG" # TODO: Remove this
     }
   ]
   job_policy = jsonencode({

@@ -105,6 +105,7 @@ class RunScanUseCase:
                 source=task.source,
             )
             output_result = output_service.execute(ai_result)
+            LOGGER.debug("Output result: %s", output_result)
             if ai_result.status == ScanStatus.FAILED:
                 self.mark_task_failed_use_case.execute(
                     task.id, output_result.to_dict(), len(files)
