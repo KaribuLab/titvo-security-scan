@@ -16,6 +16,14 @@ dependency "batch" {
   }
 }
 
+dependency "ecr" {
+  config_path = "${get_parent_terragrunt_dir()}/aws/ecr"
+  mock_outputs = {
+    ecr_repository_url = "012345678901.dkr.ecr.us-east-1.amazonaws.com"
+  }
+}
+
+
 include {
   path = find_in_parent_folders()
 }
@@ -38,6 +46,13 @@ inputs = {
       tier        = "Standard"
       description = "Security Scan Job Queue ARN"
       value       = dependency.batch.outputs.job_queue_arn
+    },
+    {
+      path        = "ecr-registry-url"
+      type        = "String"
+      tier        = "Standard"
+      description = "ECR Registry URL"
+      value       = dependency.ecr.outputs.ecr_repository_url
     }
   ]
 }
