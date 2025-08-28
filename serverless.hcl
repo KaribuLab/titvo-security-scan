@@ -1,6 +1,8 @@
 locals {
-  region = get_env("AWS_REGION")
-  stage  = get_env("AWS_STAGE")
+  region        = get_env("AWS_REGION")
+  stage         = get_env("AWS_STAGE")
+  account_id    = get_env("AWS_ACCOUNT_ID", "")
+  bucket_suffix = local.account_id == "" ? "" : "-${local.account_id}"
   stages = {
     test = {
       name = "Testing"
@@ -10,15 +12,12 @@ locals {
     }
   }
   provider_version = "6.7.0"
-  parameter_path   = get_env("PARAMETER_PATH", "/tvo/security-scan")
-  service_name     = get_env("PROJECT_NAME", "tvo-security-scan")
-  service_bucket   = get_env("BUCKET_STATE_NAME", "${local.service_name}-${local.region}")
+  parameter_path   = "/tvo/security-scan"
+  service_name     = "tvo-security-scan"
+  service_bucket   = "${local.service_name}-${local.region}${local.bucket_suffix}"
   log_retention    = 7
   tags_file_path   = "${get_terragrunt_dir()}/common_tags.json"
   common_tags = fileexists(local.tags_file_path) ? jsondecode(file(local.tags_file_path)) : {
-    Project     = "Titvo Security Scan"
-    Customer    = "Titvo"
-    Team        = "Area Creacion"
-    Environment = "${local.stages[local.stage].name}"
+    Project = "Titvo Security Scan Runner"
   }
 }
