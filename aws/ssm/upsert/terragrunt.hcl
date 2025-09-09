@@ -56,7 +56,7 @@ inputs = {
       value       = dependency.ecr.outputs.ecr_repository_url
     },
     {
-      path        = "ecr-repository-arn"
+      path        = "ecr-registry-arn"
       type        = "String"
       tier        = "Standard"
       description = "ECR Repository ARN"
