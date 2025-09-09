@@ -1,5 +1,5 @@
 terraform {
-  source = "git::https://github.com/KaribuLab/terraform-aws-ecr.git?ref=v0.1.0"
+  source = "git::https://github.com/KaribuLab/terraform-aws-ecr.git?ref=v0.2.0"
 }
 
 locals {

@@ -20,6 +20,7 @@ dependency "ecr" {
   config_path = "${get_parent_terragrunt_dir()}/aws/ecr"
   mock_outputs = {
     ecr_repository_url = "012345678901.dkr.ecr.us-east-1.amazonaws.com"
+    ecr_repository_arn = "arn:aws:ecr:us-east-1:012345678901:repository/security-scan-repository"
   }
 }
 
@@ -53,6 +54,13 @@ inputs = {
       tier        = "Standard"
       description = "ECR Registry URL"
       value       = dependency.ecr.outputs.ecr_repository_url
+    },
+    {
+      path        = "ecr-repository-arn"
+      type        = "String"
+      tier        = "Standard"
+      description = "ECR Repository ARN"
+      value       = dependency.ecr.outputs.ecr_repository_arn
     }
   ]
 }
