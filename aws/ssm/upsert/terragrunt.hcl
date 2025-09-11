@@ -11,8 +11,10 @@ locals {
 dependency "batch" {
   config_path = "${get_parent_terragrunt_dir()}/aws/batch"
   mock_outputs = {
-    job_definition_arn = "arn:aws:batch:us-east-1:012345678901:job-definition/security-scan-batch-arn"
-    job_queue_arn      = "arn:aws:batch:us-east-1:012345678901:job-queue/security-scan-job-queue-arn"
+    job_definition_arn  = "arn:aws:batch:us-east-1:012345678901:job-definition/security-scan-batch-arn"
+    job_definition_name = "security-scan-batch-name"
+    job_queue_arn       = "arn:aws:batch:us-east-1:012345678901:job-queue/security-scan-job-queue-arn"
+    job_queue_name      = "security-scan-job-queue-name"
   }
 }
 
@@ -35,6 +37,13 @@ inputs = {
   tags           = local.common_tags
   parameters = [
     {
+      path        = "security-scan-batch-name"
+      type        = "String"
+      tier        = "Standard"
+      description = "Security Scan Batch Name"
+      value       = dependency.batch.outputs.job_definition_name
+    },
+    {
       path        = "security-scan-batch-arn"
       type        = "String"
       tier        = "Standard"
@@ -47,6 +56,13 @@ inputs = {
       tier        = "Standard"
       description = "Security Scan Job Queue ARN"
       value       = dependency.batch.outputs.job_queue_arn
+    },
+    {
+      path        = "security-scan-job-queue-name"
+      type        = "String"
+      tier        = "Standard"
+      description = "Security Scan Job Queue Name"
+      value       = dependency.batch.outputs.job_queue_name
     },
     {
       path        = "ecr-registry-url"
