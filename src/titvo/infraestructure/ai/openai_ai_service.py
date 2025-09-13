@@ -1,9 +1,9 @@
 from typing import Literal
 import logging
 from pydantic import BaseModel, Field
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_openai import ChatOpenAI
 from titvo.core.ports.ai_service import AiService
 from titvo.core.ports.configuration_service import ConfigurationService
 from titvo.app.scan.scan_entities import Prompt, ScanResult, ScanStatus, Annotation
@@ -75,10 +75,16 @@ class OpenAIAiService(AiService):
     def execute(self, prompt: Prompt) -> ScanResult:
         openai_api_key = self.configuration_service.get_secret("open_ai_api_key")
         model = self.configuration_service.get_value("open_ai_model")
+        llm = ChatOpenAI(
+            model=model,
+            api_key=openai_api_key,
+            max_retries=3,
+            seed=42,
+        )
         config = RunnableConfig(
             tags=["security-scan"],
             metadata={"purpose": "chunked-analysis"},
-            max_concurrency=20,
+            max_concurrency=5,
         )
         inputs = []
         for user_prompt in prompt.user_prompts:
@@ -89,15 +95,18 @@ class OpenAIAiService(AiService):
             ]
             # pylint: enable=redefined-builtin
             inputs.append(input)
-        llm = init_chat_model(model, model_provider="openai", api_key=openai_api_key)
         structured_llm = llm.with_structured_output(
             ReportAnnotation,
             method="json_mode",
         )
-        outputs = structured_llm.batch(inputs, config=config)
+        outputs = outputs = structured_llm.batch(inputs, config=config)
         annotations = []
         number_of_issues = 0
         status = ScanStatus.SUCCESS
+        medium_issues = 0
+        low_issues = 0
+        high_issues = 0
+        critical_issues = 0
         for output in outputs:
             if output.severity != "NONE":
                 annotations.append(
@@ -113,11 +122,20 @@ class OpenAIAiService(AiService):
                     )
                 )
                 number_of_issues += 1
-                status = (
-                    ScanStatus.WARNING
-                    if output.severity == "LOW"
-                    else ScanStatus.FAILED
-                )
+                if output.severity == "LOW":
+                    low_issues += 1
+                elif output.severity == "MEDIUM":
+                    medium_issues += 1
+                elif output.severity == "HIGH":
+                    high_issues += 1
+                elif output.severity == "CRITICAL":
+                    critical_issues += 1
+        if critical_issues > 0 or high_issues > 0:
+            status = ScanStatus.FAILED
+        elif medium_issues > 0 or low_issues > 0:
+            status = ScanStatus.WARNING
+        else:
+            status = ScanStatus.SUCCESS
         return ScanResult(
             annotations=annotations,
             number_of_issues=number_of_issues,
