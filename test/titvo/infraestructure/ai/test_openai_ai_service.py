@@ -9,7 +9,7 @@ from titvo.infraestructure.ai.openai_ai_service import (
 from titvo.app.scan.scan_entities import Prompt, ScanResult, ScanStatus
 
 # Constantes para los módulos que haremos patch
-LANGCHAIN_INIT_CHAT_MODEL = "titvo.infraestructure.ai.openai_ai_service.init_chat_model"
+CHAT_OPENAI = "titvo.infraestructure.ai.openai_ai_service.ChatOpenAI"
 
 # pylint: disable=redefined-outer-name
 
@@ -65,8 +65,8 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
     mock_llm = Mock()
     mock_llm.with_structured_output.return_value = mock_structured_output
 
-    # Patch de la función init_chat_model
-    with patch(LANGCHAIN_INIT_CHAT_MODEL, return_value=mock_llm):
+    # Patch de la clase ChatOpenAI
+    with patch(CHAT_OPENAI, return_value=mock_llm) as mock_chat_openai:
         # Crear servicio y ejecutar
         service = OpenAIAiService(configuration_service=mock_config_service)
         result = service.execute(sample_prompt)
@@ -75,7 +75,15 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
         mock_config_service.get_secret.assert_called_once_with("open_ai_api_key")
         mock_config_service.get_value.assert_called_once_with("open_ai_model")
 
-        # Verificar que se inicializa el modelo con los parámetros correctos
+        # Verificar que se inicializa ChatOpenAI con los parámetros correctos
+        mock_chat_openai.assert_called_once_with(
+            model="gpt-4",
+            api_key="test-api-key",
+            max_retries=3,
+            seed=42,
+        )
+        
+        # Verificar que se configura la salida estructurada
         mock_llm.with_structured_output.assert_called_once_with(
             ReportAnnotation, method="json_mode"
         )
@@ -93,7 +101,7 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
             config=RunnableConfig(
                 tags=["security-scan"],
                 metadata={"purpose": "chunked-analysis"},
-                max_concurrency=20,
+                max_concurrency=5,
             ),
         )
         # Verificar que se invoca el LLM con los mensajes correctos
@@ -132,8 +140,8 @@ def test_execute_error_handling(mock_config_service, sample_prompt):
     mock_llm = Mock()
     mock_llm.with_structured_output.side_effect = Exception("API Error")
 
-    # Patch de la función init_chat_model
-    with patch(LANGCHAIN_INIT_CHAT_MODEL, return_value=mock_llm):
+    # Patch de la clase ChatOpenAI
+    with patch(CHAT_OPENAI, return_value=mock_llm):
         # Crear servicio
         service = OpenAIAiService(configuration_service=mock_config_service)
 
@@ -188,8 +196,8 @@ def test_scan_status_mapping(mock_config_service, sample_prompt):
         mock_llm = Mock()
         mock_llm.with_structured_output.return_value = mock_structured_output
 
-        # Patch de la función init_chat_model
-        with patch(LANGCHAIN_INIT_CHAT_MODEL, return_value=mock_llm):
+        # Patch de la clase ChatOpenAI
+        with patch(CHAT_OPENAI, return_value=mock_llm):
             # Crear servicio y ejecutar
             service = OpenAIAiService(configuration_service=mock_config_service)
             result = service.execute(sample_prompt)
