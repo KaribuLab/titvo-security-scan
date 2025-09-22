@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from titvo.core.ports.configuration_service import ConfigurationService
-from titvo.infraestructure.ai.openai_ai_service import OpenAIAiService
+from titvo.infraestructure.ai.ai_factory import IAProviderFactory
 
 
 @dataclass
 class AiDependencies:
-    ai_service: OpenAIAiService
+    ai_provider_factory: IAProviderFactory
 
 
 def get_dependencies(configuration_service: ConfigurationService) -> AiDependencies:
-    return AiDependencies(ai_service=OpenAIAiService(configuration_service))
+    return AiDependencies(ai_provider_factory=IAProviderFactory(configuration_service))

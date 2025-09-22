@@ -83,6 +83,7 @@ def scan_from_container(task_id: str | None, infrastructure: str):
             dynamo_cli_files_table_name=dynamo_cli_files_table_name,
         )
         configuration_service = aws_dependencies.configuration_service
+        provider = configuration_service.get_value("provider")
         ai_dependencies = get_ai_dependencies(
             configuration_service=configuration_service
         )
@@ -99,7 +100,7 @@ def scan_from_container(task_id: str | None, infrastructure: str):
             template_path=template_path,
         )
         run_scan_use_case = RunScanUseCase(
-            ai_service=ai_dependencies.ai_service,
+            ai_provider=ai_dependencies.ai_provider_factory.get_ai_provider(provider),
             configuration_service=configuration_service,
             file_fetcher_service_factory=file_fetcher_dependencies.file_fetcher_service_factory,
             get_task_use_case=GetTaskUseCase(

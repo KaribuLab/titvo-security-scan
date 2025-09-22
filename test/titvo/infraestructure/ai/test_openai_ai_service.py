@@ -2,14 +2,14 @@ from unittest.mock import patch, Mock
 import pytest
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
-from titvo.infraestructure.ai.openai_ai_service import (
-    OpenAIAiService,
+from titvo.infraestructure.ai.openai_provider import (
+    OpenAIProvider,
     ReportAnnotation,
 )
 from titvo.app.scan.scan_entities import Prompt, ScanResult, ScanStatus
 
 # Constantes para los módulos que haremos patch
-CHAT_OPENAI = "titvo.infraestructure.ai.openai_ai_service.ChatOpenAI"
+CHAT_OPENAI = "titvo.infraestructure.ai.openai_provider.ChatOpenAI"
 
 # pylint: disable=redefined-outer-name
 
@@ -56,7 +56,7 @@ def sample_security_report():
     )
 
 
-def test_execute(mock_config_service, sample_prompt, sample_security_report):
+def test_execute(sample_prompt, sample_security_report):
     """Test para verificar que el método execute funciona correctamente."""
     # Crear mocks para langchain
     mock_structured_output = Mock()
@@ -68,12 +68,12 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
     # Patch de la clase ChatOpenAI
     with patch(CHAT_OPENAI, return_value=mock_llm) as mock_chat_openai:
         # Crear servicio y ejecutar
-        service = OpenAIAiService(configuration_service=mock_config_service)
+        service = OpenAIProvider(provider_api_key="test-api-key", provider_model="gpt-4")
         result = service.execute(sample_prompt)
 
         # Verificar llamadas al servicio de configuración
-        mock_config_service.get_secret.assert_called_once_with("open_ai_api_key")
-        mock_config_service.get_value.assert_called_once_with("open_ai_model")
+        assert service.provider_api_key == "test-api-key"
+        assert service.provider_model == "gpt-4"
 
         # Verificar que se inicializa ChatOpenAI con los parámetros correctos
         mock_chat_openai.assert_called_once_with(
@@ -134,7 +134,7 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
         assert annotation.recommendation == report_annotation.recommendation
 
 
-def test_execute_error_handling(mock_config_service, sample_prompt):
+def test_execute_error_handling(sample_prompt):
     """Test para verificar el manejo de errores en execute."""
     # Configurar mock para lanzar una excepción
     mock_llm = Mock()
@@ -143,7 +143,7 @@ def test_execute_error_handling(mock_config_service, sample_prompt):
     # Patch de la clase ChatOpenAI
     with patch(CHAT_OPENAI, return_value=mock_llm):
         # Crear servicio
-        service = OpenAIAiService(configuration_service=mock_config_service)
+        service = OpenAIProvider(provider_api_key="test-api-key", provider_model="gpt-4")
 
         # Verificar que se propaga la excepción
         with pytest.raises(Exception) as excinfo:
@@ -152,7 +152,7 @@ def test_execute_error_handling(mock_config_service, sample_prompt):
         assert "API Error" in str(excinfo.value)
 
 
-def test_scan_status_mapping(mock_config_service, sample_prompt):
+def test_scan_status_mapping(sample_prompt):
     """Test para verificar la conversión correcta del estado del escaneo."""
     # Crear informes con diferentes estados
     status_annotations = {
@@ -199,7 +199,7 @@ def test_scan_status_mapping(mock_config_service, sample_prompt):
         # Patch de la clase ChatOpenAI
         with patch(CHAT_OPENAI, return_value=mock_llm):
             # Crear servicio y ejecutar
-            service = OpenAIAiService(configuration_service=mock_config_service)
+            service = OpenAIProvider(provider_api_key="test-api-key", provider_model="gpt-4")
             result = service.execute(sample_prompt)
 
             # Verificar que el estado se mapea correctamente

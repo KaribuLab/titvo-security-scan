@@ -4,8 +4,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
-from titvo.core.ports.ai_service import AiService
-from titvo.core.ports.configuration_service import ConfigurationService
+from titvo.core.ports.ai_provider import AIProvider
 from titvo.app.scan.scan_entities import Prompt, ScanResult, ScanStatus, Annotation
 
 LOGGER = logging.getLogger(__name__)
@@ -68,16 +67,12 @@ class ReportAnnotation(BaseModel):
     )
 
 
-class OpenAIAiService(AiService):
-    def __init__(self, configuration_service: ConfigurationService):
-        self.configuration_service = configuration_service
+class OpenAIProvider(AIProvider):
 
     def execute(self, prompt: Prompt) -> ScanResult:
-        openai_api_key = self.configuration_service.get_secret("open_ai_api_key")
-        model = self.configuration_service.get_value("open_ai_model")
         llm = ChatOpenAI(
-            model=model,
-            api_key=openai_api_key,
+            model=self.provider_model,
+            api_key=self.provider_api_key,
             max_retries=3,
             seed=42,
         )

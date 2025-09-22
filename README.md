@@ -53,7 +53,7 @@ El proyecto sigue una arquitectura hexagonal (puertos y adaptadores) que separa 
   - `CliFileFetcherService`: Extracción de archivos desde tar.gz en S3
 
 - **IA y Análisis**:
-  - `OpenAIAiService`: Integración con OpenAI para análisis de seguridad
+  - `OpenAIProvider`: Integración con OpenAI para análisis de seguridad
 
 - **Servicios de Salida**:
   - `GithubOutputService`: Creación de issues en GitHub

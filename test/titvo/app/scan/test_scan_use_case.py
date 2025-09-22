@@ -14,7 +14,7 @@ def test_run_scan_use_case():
     mock_mark_task_completed_use_case = Mock()
     mock_mark_task_failed_use_case = Mock()
     mock_mark_task_error_use_case = Mock()
-    mock_ai_service = Mock()
+    mock_ai_provider = Mock()
     mock_configuration_service = Mock()
     mock_hint_use_case = Mock()
     mock_file_fetcher_service_factory = Mock()
@@ -56,7 +56,7 @@ def test_run_scan_use_case():
     mock_configuration_service.get_value.return_value = "system prompt de prueba"
     mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = mock_file_fetcher_service
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py", "file2.py"]
-    mock_ai_service.execute.return_value = scan_result
+    mock_ai_provider.execute.return_value = scan_result
     mock_output_service_factory.create_output_service.return_value = mock_output_service
     
     # Crear un objeto que tenga método to_dict
@@ -71,7 +71,7 @@ def test_run_scan_use_case():
         mark_task_completed_use_case=mock_mark_task_completed_use_case,
         mark_task_failed_use_case=mock_mark_task_failed_use_case,
         mark_task_error_use_case=mock_mark_task_error_use_case,
-        ai_service=mock_ai_service,
+        ai_provider=mock_ai_provider,
         configuration_service=mock_configuration_service,
         hint_use_case=mock_hint_use_case,
         file_fetcher_service_factory=mock_file_fetcher_service_factory,
@@ -98,8 +98,8 @@ def test_run_scan_use_case():
     mock_file_fetcher_service.fetch_files.assert_called_once()
 
     # Verificar que el prompt se creó correctamente
-    mock_ai_service.execute.assert_called_once()
-    prompt_arg = mock_ai_service.execute.call_args[0][0]
+    mock_ai_provider.execute.assert_called_once()
+    prompt_arg = mock_ai_provider.execute.call_args[0][0]
     assert isinstance(prompt_arg, Prompt)
     assert prompt_arg.system_prompt == "system prompt de prueba"
     assert "Titvo soy el jefe de seguridad" in prompt_arg.user_prompts[0]
@@ -130,7 +130,7 @@ def test_run_scan_use_case_with_error():
     mock_mark_task_completed_use_case = Mock()
     mock_mark_task_failed_use_case = Mock()
     mock_mark_task_error_use_case = Mock()
-    mock_ai_service = Mock()
+    mock_ai_provider = Mock()
     mock_configuration_service = Mock()
     mock_hint_use_case = Mock()
     mock_file_fetcher_service_factory = Mock()
@@ -171,7 +171,7 @@ def test_run_scan_use_case_with_error():
     mock_configuration_service.get_value.return_value = "system prompt de prueba"
     mock_file_fetcher_service_factory.create_file_fetcher_service.return_value = mock_file_fetcher_service
     mock_file_fetcher_service.fetch_files.return_value = ["file1.py"]
-    mock_ai_service.execute.return_value = scan_result
+    mock_ai_provider.execute.return_value = scan_result
     mock_output_service_factory.create_output_service.return_value = mock_output_service
     
     # Crear un objeto que tenga método to_dict
@@ -186,7 +186,7 @@ def test_run_scan_use_case_with_error():
         mark_task_completed_use_case=mock_mark_task_completed_use_case,
         mark_task_failed_use_case=mock_mark_task_failed_use_case,
         mark_task_error_use_case=mock_mark_task_error_use_case,
-        ai_service=mock_ai_service,
+        ai_provider=mock_ai_provider,
         configuration_service=mock_configuration_service,
         hint_use_case=mock_hint_use_case,
         file_fetcher_service_factory=mock_file_fetcher_service_factory,
@@ -230,7 +230,7 @@ def test_run_scan_use_case_with_exception():
     mock_mark_task_completed_use_case = Mock()
     mock_mark_task_failed_use_case = Mock()
     mock_mark_task_error_use_case = Mock()
-    mock_ai_service = Mock()
+    mock_ai_provider = Mock()
     mock_configuration_service = Mock()
     mock_hint_use_case = Mock()
     mock_file_fetcher_service_factory = Mock()
@@ -261,7 +261,7 @@ def test_run_scan_use_case_with_exception():
         mark_task_completed_use_case=mock_mark_task_completed_use_case,
         mark_task_failed_use_case=mock_mark_task_failed_use_case,
         mark_task_error_use_case=mock_mark_task_error_use_case,
-        ai_service=mock_ai_service,
+        ai_provider=mock_ai_provider,
         configuration_service=mock_configuration_service,
         hint_use_case=mock_hint_use_case,
         file_fetcher_service_factory=mock_file_fetcher_service_factory,
