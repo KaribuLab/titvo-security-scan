@@ -7,7 +7,7 @@ from titvo.infraestructure.ai.openai_ai_service import OpenAIAiService
 
 
 def create_ai_service(configuration_service: ConfigurationService) -> AiService:
-    provider = configuration_service.get_value("ai_provider")
+    provider = configuration_service.get_value("ai_provider").lower().strip()
     if provider == "openai":
         return OpenAIAiService(configuration_service)
     elif provider == "anthropic":

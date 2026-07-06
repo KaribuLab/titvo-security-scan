@@ -30,15 +30,12 @@ class BaseAiService(AiService):
         )
         inputs = []
         for user_prompt in prompt.user_prompts:
-            input = [
+            messages = [
                 SystemMessage(content=prompt.system_prompt),
                 HumanMessage(content=f"{user_prompt}\n\njson"),
             ]
-            inputs.append(input)
-        structured_llm = llm.with_structured_output(
-            ReportAnnotation,
-            method="json_mode",
-        )
+            inputs.append(messages)
+        structured_llm = llm.with_structured_output(ReportAnnotation)
         outputs = structured_llm.batch(inputs, config=config)
         annotations = []
         number_of_issues = 0

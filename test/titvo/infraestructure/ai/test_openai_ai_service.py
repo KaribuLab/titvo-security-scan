@@ -66,9 +66,7 @@ def test_execute(mock_config_service, sample_prompt, sample_security_report):
         mock_config_service.get_secret.assert_called_once_with("open_ai_api_key")
         mock_config_service.get_value.assert_called_once_with("open_ai_model")
 
-        mock_llm.with_structured_output.assert_called_once_with(
-            ReportAnnotation, method="json_mode"
-        )
+        mock_llm.with_structured_output.assert_called_once_with(ReportAnnotation)
         mock_structured_output.batch.assert_called_once_with(
             [
                 [
@@ -173,4 +171,4 @@ def test_scan_status_mapping(mock_config_service, sample_prompt):
             result = service.execute(sample_prompt)
 
             assert result.status == ScanStatus(status)
-            assert result.number_of_issues == 0 if status == "SUCCESS" else 1
+            assert result.number_of_issues == (0 if status == "SUCCESS" else 1)
